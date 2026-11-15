@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { type createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 import { z } from "zod";
@@ -33,6 +33,7 @@ import { linearLink, linearRef, savedLinearKey, saveLinearKey } from "./linear";
 import { handleTools, setToolBase } from "./mcp-http";
 import { createNavigator } from "./navigate";
 import { claudeEnv, PrefsPatch, prefsOf, savedKey, saveKey } from "./prefs";
+import * as self from "./self";
 import { createSnapshots } from "./snapshot";
 import { openStore } from "./store";
 import * as term from "./term";
@@ -43,6 +44,21 @@ const dev = process.env.NIT_DEV === "1";
 const uiDir = uiDirFor(dev);
 
 const args = process.argv.slice(2);
+// nit looking after itself (self.ts). These work from anywhere, not just a repository.
+if (args[0] === "status" || args[0] === "update" || args[0] === "uninstall") {
+  const extra = args.slice(1).filter((a) => !(args[0] === "uninstall" && ["--purge", "--yes", "-y"].includes(a)));
+  if (extra.length)
+    term.fail(
+      new term.NitError(`nit ${args[0]} doesn't take ${extra.join(" ")}`, undefined, "See what it takes: nit --help"),
+    );
+  await (args[0] === "status"
+    ? self.status()
+    : args[0] === "update"
+      ? self.update()
+      : self.uninstall(args.slice(1))
+  ).catch(term.fail);
+  process.exit(0);
+}
 if (args[0] === "--version" || args[0] === "-v") {
   console.log(VERSION);
   process.exit(0);
@@ -997,9 +1013,14 @@ term.banner({
   root,
 });
 started = true;
+self.registerRunning({ url, repo: basename(root), branch: shownBranch });
 term.keys({ o: { label: "open", run: openBrowser }, q: { label: "quit", run: () => process.exit(0) } });
 if (process.env.NIT_NO_OPEN !== "1") openBrowser();
 
+// A newer nit, checked at most once a day.
+void self.updateNotice().then((v) => {
+  if (v) term.log(`${term.c.cyan("↑")} nit ${v} is out ${term.c.dim(`(you have ${VERSION}) · run nit update`)}`);
+});
 // Say up front what won't work, rather than only in the page: GitHub and Claude sign-in.
 void github.state().then((gh) => {
   if (gh.status === "ready") {

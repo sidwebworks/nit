@@ -141,16 +141,27 @@ export const header = (version: string) => {
 
 /**
  * One step of getting the review ready: a spinner while it runs, then a tick (or a cross) and
- * how long it took. `done` can say what it found.
+ * how long it took. `done` can say what it found; `note` shows progress beside the spinner.
  */
-export async function task<T>(label: string, fn: () => Promise<T>, done?: (r: T) => string): Promise<T> {
+export async function task<T>(
+  label: string,
+  fn: (note: (progress: string) => void) => Promise<T>,
+  done?: (r: T) => string,
+): Promise<T> {
   const since = Date.now();
   let frame = 0;
-  const draw = () => tty && process.stdout.write(`\r\x1b[2K  ${c.cyan(SPIN[frame++ % SPIN.length])} ${label}…`);
+  let progress = "";
+  const draw = () =>
+    tty &&
+    process.stdout.write(
+      `\r\x1b[2K  ${c.cyan(SPIN[frame++ % SPIN.length])} ${label}…${progress ? `  ${c.dim(progress)}` : ""}`,
+    );
   draw();
   const spin = tty ? setInterval(draw, 80) : undefined;
   try {
-    const r = await fn();
+    const r = await fn((p) => {
+      progress = p;
+    });
     clearInterval(spin);
     clearFooter();
     const ms = Date.now() - since;
@@ -167,7 +178,7 @@ const seconds = (ms: number) => (ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `$
 
 /** `nit --help`. */
 export function help(version: string) {
-  const row = (cmd: string, what: string) => `    ${cmd.padEnd(20)}${c.dim(what)}`;
+  const row = (cmd: string, what: string) => `    ${cmd.padEnd(24)}${c.dim(what)}`;
   out(
     [
       "",
@@ -178,6 +189,11 @@ export function help(version: string) {
       row("nit <branch>", "review it against another branch or commit"),
       row("nit <pr>", "review a pull request: 2234, #2234 or its URL"),
       "",
+      `  ${c.bold("Commands")}`,
+      row("nit status", "version, sign-ins and the reviews open now"),
+      row("nit update", "install the latest release"),
+      row("nit uninstall", "remove nit; --purge also removes your data"),
+      "",
       `  ${c.bold("Options")}`,
       row("-h, --help", "show this"),
       row("-v, --version", "print the version"),
@@ -186,6 +202,7 @@ export function help(version: string) {
       row("NIT_PORT", "the port to serve on"),
       row("NIT_NO_OPEN=1", "don't open the browser"),
       row("NIT_DEBUG=1", "show stack traces with errors"),
+      row("NIT_NO_UPDATE_CHECK=1", "don't check for a newer nit"),
       "",
       `  ${c.dim("https://sidwebworks.com/things/nit")}`,
       "",
