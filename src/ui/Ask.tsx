@@ -1,5 +1,6 @@
 import { ArrowUp, Sparks, Trash, Xmark } from "iconoir-react/regular";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { CODEX_KEY_ERROR, CODEX_SIGN_IN_ERROR } from "../types";
 import * as agent from "./agent";
 import * as st from "./state";
 import { Button, IconButton, Kbd } from "./ui";
@@ -59,6 +60,7 @@ export function AskAnnotation() {
   );
   const [text, setText] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
+  const who = st.useStore(st.reviewerName);
 
   const here =
     job?.kind === "ask" &&
@@ -107,12 +109,12 @@ export function AskAnnotation() {
   return (
     <div className="px-3 py-1.5 font-sans">
       <section
-        aria-label={`Ask Claude about ${where}`}
+        aria-label={`Ask ${who} about ${where}`}
         className="max-w-[780px] overflow-hidden rounded-card bg-surface shadow-[0_0_0_1px_color-mix(in_oklch,var(--accent)_45%,transparent),0_2px_8px_oklch(0_0_0/0.08)]"
       >
         <header className="flex h-9 items-center gap-2 px-3 text-[12px]">
           <Sparks width={13} height={13} className="shrink-0 text-accent-ink" />
-          <span className="shrink-0 font-medium whitespace-nowrap text-ink">Ask Claude</span>
+          <span className="shrink-0 font-medium whitespace-nowrap text-ink">Ask {who}</span>
           <span className="min-w-0 truncate whitespace-nowrap text-ink-3">{where}</span>
           <span className="ml-auto flex shrink-0 items-center gap-1">
             {thread && !running ? (
@@ -157,7 +159,22 @@ export function AskAnnotation() {
               </p>
             ) : null}
             {live?.state === "failed" ? (
-              <p className="mt-1 text-[12.5px] text-red">{live.error ?? "Claude couldn't answer."}</p>
+              <p className="mt-1 text-[12.5px] text-red">
+                {live.error ?? `${who} couldn't answer.`}
+                {live.error === CODEX_SIGN_IN_ERROR || live.error === CODEX_KEY_ERROR ? (
+                  <span className="block text-ink-3">
+                    Run <code className="font-mono">codex login</code> in a terminal, or add an OpenAI key in{" "}
+                    <button
+                      type="button"
+                      className="text-accent-ink [@media(hover:hover)]:hover:underline"
+                      onClick={() => st.set({ settingsOpen: true, settingsSection: "reviewer" })}
+                    >
+                      Settings → Reviewer
+                    </button>
+                    .
+                  </span>
+                ) : null}
+              </p>
             ) : null}
             {!running && latest ? (
               <div className="mt-2.5 flex items-center gap-1.5">
@@ -205,7 +222,7 @@ export function AskAnnotation() {
               }
             }}
             placeholder={talked ? "Ask a follow-up…" : `Ask about ${where}…`}
-            aria-label="Question for Claude"
+            aria-label={`Question for ${who}`}
             className="max-h-32 min-h-6 flex-1 resize-none bg-transparent text-[13px] leading-6 text-ink outline-none placeholder:text-ink-3 [field-sizing:content]"
           />
           {running ? (
@@ -229,6 +246,7 @@ export function AskAnnotation() {
  */
 export function AskChip({ id }: { id: string }) {
   const t = st.useStore((s) => s.asks.find((x) => x.id === id));
+  const who = st.useStore(st.reviewerName);
   if (!t) return null;
   const last = t.turns.at(-1);
   return (
@@ -239,7 +257,7 @@ export function AskChip({ id }: { id: string }) {
         className="flex h-7 max-w-[780px] items-center gap-2 rounded-control px-2 text-left text-[12px] text-ink-3 shadow-[0_0_0_1px_var(--line)] transition-[background-color,color] duration-100 [@media(hover:hover)]:hover:bg-hover [@media(hover:hover)]:hover:text-ink-2"
       >
         <Sparks width={12} height={12} className="shrink-0 text-accent-ink" />
-        <span className="shrink-0 font-medium text-ink-2">Claude</span>
+        <span className="shrink-0 font-medium text-ink-2">{who}</span>
         <span className="min-w-0 truncate">{last?.question}</span>
         {t.turns.length > 1 ? <span className="shrink-0 tabular-nums">+{t.turns.length - 1}</span> : null}
       </button>

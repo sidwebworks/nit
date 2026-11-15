@@ -163,7 +163,7 @@ export const actions: Action[] = [
   {
     id: "coreview",
     group: "Review",
-    label: "Co-review with Claude",
+    label: "Co-review the diff",
     keys: [],
     icon: <Sparks />,
     when: () => st.get().agent?.state !== "running" && st.get().job?.state !== "running",
@@ -190,7 +190,7 @@ export const actions: Action[] = [
   {
     id: "ask",
     group: "Review",
-    label: "Ask Claude about these lines",
+    label: "Ask about these lines",
     keys: ["Mod+i"],
     icon: <Sparks />,
     when: () => !!st.get().cursor && !st.get().browse,
@@ -199,7 +199,7 @@ export const actions: Action[] = [
   {
     id: "accept-proposal",
     group: "Review",
-    label: "Accept Claude's proposal",
+    label: "Accept the proposed comment",
     keys: ["y"],
     icon: <Check />,
     when: () => !!focusedDraft()?.proposal,

@@ -78,8 +78,9 @@ function ApplyButton({ primary = false }: { primary?: boolean }) {
 function CoReviewButton() {
   const busy = st.useStore((s) => s.agent?.state === "running" || s.job?.state === "running");
   const reviewing = st.useStore((s) => s.job?.kind === "review" && s.job.state === "running");
+  const who = st.useStore(st.reviewerName);
   return (
-    <Tooltip label="Claude reviews the diff and proposes comments for you to accept" side="top">
+    <Tooltip label={`${who} reviews the diff and proposes comments for you to accept`} side="top">
       <Button tone="secondary" disabled={busy} onClick={() => void agent.coreview()}>
         <Sparks width={14} height={14} /> {reviewing ? "Reviewing…" : "Co-review"}
       </Button>
@@ -273,7 +274,7 @@ export function ReviewSheet() {
                     >
                       <div className="flex h-8 items-center gap-1.5 px-2 pt-1">
                         <Sparks width={13} height={13} className="text-accent-ink" />
-                        <span className="text-[12.5px] font-medium text-ink">Your questions to Claude</span>
+                        <span className="text-[12.5px] font-medium text-ink">Your questions</span>
                         <span className="text-[12px] text-ink-3 tabular-nums">{questions.length}</span>
                         <span className="ml-auto flex items-center gap-1 text-[11.5px] text-ink-3">
                           <Lock width={11} height={11} /> Only you see these

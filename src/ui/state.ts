@@ -86,7 +86,7 @@ export type State = {
   reviewOpen: boolean;
   settingsOpen: boolean;
   /** The settings section shown, kept between openings. */
-  settingsSection: "appearance" | "diff" | "claude" | "github" | "linear" | "commands";
+  settingsSection: "appearance" | "diff" | "reviewer" | "github" | "linear" | "commands";
   /** The search screen replaces the diff; its query lives in the URL (?search=…). */
   searchOpen: boolean;
   search: { query: string; regex: boolean; caseSensitive: boolean };
@@ -480,6 +480,9 @@ export function setPrefs(patch: Partial<Prefs>) {
     300,
   );
 }
+
+/** Who answers questions, orders the files and co-reviews, by name. */
+export const reviewerName = (s: State = state) => (s.prefs.reviewer === "codex" ? "Codex" : "Claude");
 
 /** Whether the file list sets this file aside (Hide generated / tests / docs / viewed). */
 export function hiddenFile(name: string, s: State = state) {

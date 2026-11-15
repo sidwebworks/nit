@@ -35,7 +35,7 @@ function SignIn({ retry }: { retry: (() => void) | null }) {
   }, [retry]);
 
   const close = () => st.set({ signIn: null });
-  const useKey = () => st.set({ signIn: null, settingsOpen: true, settingsSection: "claude" });
+  const useKey = () => st.set({ signIn: null, settingsOpen: true, settingsSection: "reviewer" });
 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && close()}>

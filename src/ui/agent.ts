@@ -1,4 +1,15 @@
-import { type AgentEvent, type AgentRun, type AskThread, type Job, SIGN_IN_ERROR } from "../types";
+import {
+  type AgentEvent,
+  type AgentRun,
+  type AskThread,
+  CODEX_KEY_ERROR,
+  CODEX_SIGN_IN_ERROR,
+  type Job,
+  SIGN_IN_ERROR,
+} from "../types";
+
+const openReviewerSettings = () => st.set({ settingsOpen: true, settingsSection: "reviewer" });
+
 import { api } from "./api";
 import * as nav from "./nav";
 import { needSignIn } from "./SignIn";
@@ -56,7 +67,12 @@ async function jobFinished(job: Job) {
   if (job.state === "failed")
     return job.kind === "ask" && st.get().asking
       ? undefined
-      : st.fail(`Claude couldn't finish: ${job.error ?? "unknown error"}`);
+      : job.error === CODEX_SIGN_IN_ERROR || job.error === CODEX_KEY_ERROR
+        ? st.notify(`${job.error} Run \`codex login\`, or add an OpenAI key.`, {
+            label: "Settings",
+            run: openReviewerSettings,
+          })
+        : st.fail(`${job.reviewer === "codex" ? "Codex" : "Claude"} couldn't finish: ${job.error ?? "unknown error"}`);
   // A finished answer is saved with its lines' conversation: fetch those to show it there.
   if (job.kind === "ask" && job.state === "done")
     return void api.asks().then(
@@ -70,8 +86,9 @@ async function jobFinished(job: Job) {
   if (job.state === "stopped" || job.kind !== "review") return;
   await st.load(); // the proposals are drafts now
   const dropped = job.dropped.length ? ` · ${job.dropped.length} dropped by checks` : "";
-  if (!job.found) return st.toast(`Claude found nothing worth raising${dropped}`);
-  st.notify(`Claude proposed ${job.found} ${job.found === 1 ? "comment" : "comments"}${dropped}`, {
+  const who = job.reviewer === "codex" ? "Codex" : "Claude";
+  if (!job.found) return st.toast(`${who} found nothing worth raising${dropped}`);
+  st.notify(`${who} proposed ${job.found} ${job.found === 1 ? "comment" : "comments"}${dropped}`, {
     label: "Review",
     run: () => {
       const first = st.orderedDrafts().find((d) => d.proposal);

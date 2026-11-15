@@ -242,7 +242,7 @@ function lineMenu(target: Element): MenuItem[] | null {
       ? [{ label: "Copy", icon: <Copy />, keys: "Mod+c", run: () => copy(picked, "the selection") }, null]
       : []),
     { label: "Comment", icon: <ChatPlusIn />, keys: "c", run: st.startComment },
-    { label: "Ask Claude", icon: <Sparks />, keys: "Mod+i", run: agent.startAsk },
+    { label: `Ask ${st.reviewerName()}`, icon: <Sparks />, keys: "Mod+i", run: agent.startAsk },
     ...(side === "additions"
       ? [
           {

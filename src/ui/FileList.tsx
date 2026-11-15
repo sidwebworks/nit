@@ -25,11 +25,12 @@ function GuideButton() {
   const on = st.useStore((s) => s.prefs.guided && !!s.data?.guide);
   const busy = st.useStore((s) => s.job?.state === "running" || s.agent?.state === "running");
   const ordering = st.useStore((s) => s.job?.state === "running" && s.job.kind === "guide");
+  const who = st.useStore(st.reviewerName);
   const label = has
     ? on
       ? "Show the files as a tree"
-      : "Show Claude's reading order"
-    : "Ask Claude for a reading order";
+      : "Show the suggested reading order"
+    : `Ask ${who} for a reading order`;
   return (
     <button
       type="button"
@@ -98,6 +99,7 @@ function HideMenu({ hidden }: { hidden: number }) {
 export function FileList() {
   const agentRunning = st.useStore((s) => s.agent?.state === "running" || s.job?.state === "running");
   const jobKind = st.useStore((s) => (s.job?.state === "running" ? s.job.kind : null));
+  const jobWho = st.useStore((s) => (s.job?.reviewer === "codex" ? "Codex" : "Claude"));
   const agentCount = st.useStore((s) => s.agent?.drafts.length ?? 0);
   const width = st.useStore((s) => s.widths.files);
   const files = st.useStore((s) => s.files);
@@ -192,11 +194,11 @@ export function FileList() {
             <span className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
             <span className="truncate">
               {jobKind === "review"
-                ? "Claude is reviewing…"
+                ? `${jobWho} is reviewing…`
                 : jobKind === "ask"
-                  ? "Claude is answering…"
+                  ? `${jobWho} is answering…`
                   : jobKind === "guide"
-                    ? "Claude is ordering the files…"
+                    ? `${jobWho} is ordering the files…`
                     : `Claude is applying ${agentCount}…`}
             </span>
           </button>
@@ -217,7 +219,7 @@ export function FileList() {
           <button
             type="button"
             onClick={() => st.set({ reviewOpen: true, reviewAt: "questions" })}
-            title="Your questions to Claude (only you see these)"
+            title="Your questions (only you see these)"
             className="flex h-7 items-center gap-1.5 rounded-control px-2 text-[12.5px] text-ink-2 tabular-nums transition-[background-color,color] duration-100 [@media(hover:hover)]:hover:bg-hover-2 [@media(hover:hover)]:hover:text-ink"
           >
             <Sparks width={14} height={14} className="text-accent-ink" />
