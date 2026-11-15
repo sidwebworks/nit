@@ -1,6 +1,6 @@
 {
   "name": "nit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Keyboard-first local code review, with Claude as a second reader",
   "homepage": "https://sidwebworks.com/things/nit",
