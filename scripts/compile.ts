@@ -41,7 +41,7 @@ await Bun.write(entry, `${lines.join("\n")}\n`);
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "pkg"), { recursive: true });
 const bin = join(out, "pkg/nit");
-await $`bun build ${entry} --compile --minify --target=${target} --outfile=${bin} --external=bun-plugin-tailwind ${
+await $`bun build ${entry} --compile --minify --target=${target} --outfile=${bin} --external=vite ${
   os === "linux" ? ["--define", `FFF_LIBC="${process.env.FFF_LIBC ?? "gnu"}"`] : []
 }`.cwd(root);
 

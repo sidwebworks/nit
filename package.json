@@ -27,6 +27,7 @@
   },
   "scripts": {
     "dev": "NIT_DEV=1 bun src/cli.ts",
+    "dev:ui": "bunx --bun vite",
     "typecheck": "tsc --noEmit",
     "build:ui": "bun src/build.ts",
     "compile": "bun scripts/compile.ts"
@@ -38,7 +39,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@openai/codex-sdk": "0.169.0",
-    "@pierre/diffs": "^1.6.4",
+    "@pierre/diffs": "1.6.4",
     "@pierre/theming": "1.0.2",
     "@pierre/trees": "1.0.0",
     "@silk-hq/components": "^0.10.2",
@@ -55,11 +56,14 @@
   },
   "devDependencies": {
     "@octokit/graphql-schema": "^15.26.1",
+    "@tailwindcss/vite": "^4.3.5",
     "@types/bun": "^1.4.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "bun-plugin-tailwind": "^0.1.2",
+    "@vitejs/plugin-react": "^6.3.0",
+    "oxc-transform-react": "^0.158.0",
     "tailwindcss": "^4.3.5",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
   }
 }

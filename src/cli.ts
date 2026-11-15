@@ -201,6 +201,12 @@ if (!compiled() && (dev || isStale(uiDir)))
     () => "Built the page",
   );
 
+/** The saved theme, layout and settings, set before first paint so the page never flashes the default. */
+function bootScript() {
+  const inline = (v: unknown) => JSON.stringify(v).replaceAll("<", "\\u003c");
+  return `window.nitTheme=${inline(store.setting("theme"))};window.nitLayout=${inline(store.setting("layout"))};window.nitPrefs=${inline(prefsOf(store))};${themeBoot}`;
+}
+
 /** The images the diff shows as pictures (ui/ImageDiff.tsx keeps the same list). */
 const IMAGE_TYPES: Record<string, string> = {
   png: "image/png",
@@ -482,6 +488,10 @@ const serve = (p: number) =>
           const d = store.draft(req.params.id);
           return d ? applySuggestion(d) : fail(404, "draft not found");
         }),
+      },
+      // The same script for a page nit doesn't serve itself: Vite's dev server (vite.config.ts).
+      "/api/boot.js": {
+        GET: guarded(() => new Response(bootScript(), { headers: { "content-type": "text/javascript" } })),
       },
       "/api/symbols": {
         GET: guarded(async (req) => {
@@ -953,21 +963,16 @@ const serve = (p: number) =>
       const path = new URL(req.url).pathname;
       if (dev && path === "/" && isStale(uiDir)) await buildUI(uiDir);
       if (path === "/") {
-        // The saved theme goes in before first paint, so the page never flashes the default.
         const html = await uiFile("/index.html").text();
-        const inline = (v: unknown) => JSON.stringify(v).replaceAll("<", "\\u003c");
-        const settings = `window.nitTheme=${inline(store.setting("theme"))};window.nitLayout=${inline(store.setting("layout"))};window.nitPrefs=${inline(prefsOf(store))};`;
-        return new Response(html.replace("</head>", `<script>${settings}${themeBoot}</script></head>`), {
+        return new Response(html.replace("</head>", `<script>${bootScript()}</script></head>`), {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
       }
       const file = uiFile(path);
       if (path.includes("..") || !(await file.exists())) return fail(404, "not found");
-      // Chunk names carry a content hash: the browser can keep them for good.
+      // Vite's assets carry a content hash: the browser can keep them for good.
       return new Response(file, {
-        headers: /\/chunk-[a-z0-9]+\.(js|css)$/.test(path)
-          ? { "cache-control": "public, max-age=31536000, immutable" }
-          : {},
+        headers: path.startsWith("/assets/") ? { "cache-control": "public, max-age=31536000, immutable" } : {},
       });
     }),
   });

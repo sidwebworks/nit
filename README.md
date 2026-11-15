@@ -88,6 +88,7 @@ Reviews, drafts and settings stay on your machine, in `~/.local/share/nit` (or `
 ```sh
 bun install
 bun run dev          # NIT_DEV=1: rebuilds the UI as you edit
+bun run dev:ui       # Vite with hot reload, beside a nit on NIT_PORT (default 40123)
 bun test
 bun run compile      # the single binary for this machine, in dist/release
 ```

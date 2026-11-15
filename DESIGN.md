@@ -252,8 +252,8 @@ Not taken: chat, prompt bar, recommendation cards, records and filter tables,
 flowchart, insight cards and the fine-tune inspector. nit has no use for them.
 
 **Styling:** Tailwind v4, so registry components copy in with little change.
-Bun's HTML bundler runs it through `bun-plugin-tailwind`. That's two dev
-dependencies and no runtime cost.
+Vite builds the page (React with its compiler, Tailwind through
+`@tailwindcss/vite`). Dev dependencies only, no runtime cost.
 
 ### Libraries underneath (built)
 

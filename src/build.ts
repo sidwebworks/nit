@@ -1,4 +1,4 @@
-import { readdirSync, rmSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -27,7 +27,7 @@ export function isStale(dir: string) {
 
 const building = new Map<string, Promise<void>>();
 
-/** Bundles the browser UI (React + Tailwind) into `dir`. Requests during a build share it. */
+/** Bundles the browser UI (Vite: React with its compiler, Tailwind) into `dir`. Requests during a build share it. */
 export function buildUI(dir: string) {
   let b = building.get(dir);
   if (!b) {
@@ -38,22 +38,13 @@ export function buildUI(dir: string) {
 }
 
 async function build(dir: string) {
-  rmSync(dir, { recursive: true, force: true });
-  // Loaded only when building: the single binary carries a built UI and no Tailwind.
-  const { default: tailwind } = await import("bun-plugin-tailwind");
-  const result = await Bun.build({
-    entrypoints: [join(import.meta.dir, "ui/index.html")],
-    outdir: dir,
-    plugins: [tailwind],
-    minify: true,
-    splitting: true,
-    sourcemap: "linked",
-    define: { "process.env.NODE_ENV": JSON.stringify("production") },
+  // Loaded only when building: the single binary carries a built UI and no Vite.
+  const { build: vite } = await import("vite");
+  await vite({
+    configFile: join(root, "vite.config.ts"),
+    logLevel: "warn",
+    build: { outDir: dir, emptyOutDir: true },
   });
-  if (!result.success) throw new AggregateError(result.logs, "nit: UI build failed");
-  // Pierre's self-contained highlighting worker, served beside the page (ui/pool.tsx).
-  const worker = Bun.resolveSync("@pierre/diffs/worker/worker-portable.js", import.meta.dir);
-  await Bun.write(join(dir, "worker-portable.js"), Bun.file(worker));
 }
 
 if (import.meta.main) {
