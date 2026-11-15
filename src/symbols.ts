@@ -111,7 +111,8 @@ export function load(grammar: Grammar): Promise<Loaded> {
       return {
         parser,
         get query() {
-          return (query ??= new Query(language, g.query));
+          query ??= new Query(language, g.query);
+          return query;
         },
         outline: g.outline ? new Query(language, g.outline) : null,
       };

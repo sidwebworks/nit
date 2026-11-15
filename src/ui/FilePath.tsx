@@ -17,7 +17,11 @@ export function FilePath({
   const parent = `${parts.length > 2 ? "… / " : ""}${parts.slice(-2).join(" / ")}`;
 
   return (
-    <nav aria-label="File path" title={fullPath} className="flex min-w-0 items-center gap-1 overflow-hidden text-[13px]">
+    <nav
+      aria-label="File path"
+      title={fullPath}
+      className="flex min-w-0 items-center gap-1 overflow-hidden text-[13px]"
+    >
       {previous ? <span className="min-w-0 shrink truncate text-ink-3">{previous} →</span> : null}
       <span className="flex min-w-0 shrink items-center gap-1">
         {parent ? <span className="min-w-0 truncate text-ink-3">{parent} /</span> : null}

@@ -60,7 +60,11 @@ test("children follow the surviving same-named parent", () => {
 });
 
 test("same-line classes keep their methods in separate scopes", async () => {
-  const old = (await parse("same-line:old", "one.ts", "class A { run() { return 1 } } class B { run() { return 2 } }"))!;
+  const old = (await parse(
+    "same-line:old",
+    "one.ts",
+    "class A { run() { return 1 } } class B { run() { return 2 } }",
+  ))!;
   const now = (await parse("same-line:new", "one.ts", "class B { run() { return 2 } }"))!;
   const view = buildOutline(now.outline, old.outline, new Set([1]), new Set([1]));
   expect(view.removed.map((entry) => `${entry.kind}:${entry.name}`)).toEqual(["class:A", "method:run"]);
