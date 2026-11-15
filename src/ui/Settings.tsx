@@ -1,6 +1,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Select } from "@base-ui/react/select";
 import type { ColorMode, ColorScheme } from "@pierre/theming";
+import { useQuery } from "@tanstack/react-query";
 import {
   Check,
   Code,
@@ -9,15 +10,24 @@ import {
   Github as GitHubIcon,
   NavArrowDown,
   Page,
+  Refresh,
   Settings as SettingsIcon,
   Sparks,
   Xmark,
 } from "iconoir-react/regular";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
-import type { AuthStatus, CommandSetting, CommandSettings, GitHubAccount, Prefs } from "../types";
+import type { AuthStatus, CommandSetting, CommandSettings, Prefs } from "../types";
 import { api } from "./api";
+import {
+  claudeAuthQuery,
+  codexAuthQuery,
+  commandsQuery,
+  githubAccountQuery,
+  linearKeyQuery,
+  queryClient,
+} from "./query";
 import * as st from "./state";
-import { catalog, nameFor, theme, useTheme } from "./theme";
+import { catalog, nameFor, switchTheme, theme, useTheme } from "./theme";
 import { Button, IconButton, Kbd, TextSegmented } from "./ui";
 
 // Shiki's themes have ids only (night-owl, github-dark-dimmed); show them as names.
@@ -132,11 +142,14 @@ function Stepper(o: { value: number; onChange: (v: number) => void; min: number;
 }
 
 /** One setting: what it is and what it does on the left, its control on the right. */
-function Row({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
+function Row({ title, hint, keys, children }: { title: string; hint?: ReactNode; keys?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-13 items-center gap-6 px-4 py-2.5 shadow-[0_1px_0_var(--line-soft)] last:shadow-none">
+    <div className="flex min-h-12 items-center gap-6 px-4 py-2 shadow-[0_1px_0_var(--line-soft)] last:shadow-none">
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] text-ink">{title}</div>
+        <div className="flex items-center gap-1.5 text-[13px] text-ink">
+          {title}
+          {keys ? <Kbd k={keys} quiet /> : null}
+        </div>
         {hint ? <div className="mt-0.5 text-[12px] leading-[17px] text-ink-3">{hint}</div> : null}
       </div>
       <div className="shrink-0">{children}</div>
@@ -161,34 +174,35 @@ function Appearance() {
   const t = useTheme();
   const size = st.useStore((s) => s.prefs.fontSize);
   return (
-    <>
-      <Group title="Colours">
-        <Row title="Mode">
-          <TextSegmented label="Colour mode" value={t.mode} onChange={(m) => theme.setColorMode(m)} options={MODES} />
-        </Row>
-        <Row title="Light theme" hint="Code and diff colours when nit is light.">
-          <Choice
-            label="Light theme"
-            value={nameFor(t, "light")}
-            options={themeOptions("light")}
-            onChange={(v) => theme.setThemeNameForScheme("light", v)}
-          />
-        </Row>
-        <Row title="Dark theme" hint="Code and diff colours when nit is dark.">
-          <Choice
-            label="Dark theme"
-            value={nameFor(t, "dark")}
-            options={themeOptions("dark")}
-            onChange={(v) => theme.setThemeNameForScheme("dark", v)}
-          />
-        </Row>
-      </Group>
-      <Group title="Text">
-        <Row title="Code size" hint="Text size in the diff and in files.">
-          <Stepper value={size} min={11} max={16} step={0.5} onChange={(fontSize) => st.setPrefs({ fontSize })} />
-        </Row>
-      </Group>
-    </>
+    <Group>
+      <Row title="Mode">
+        <TextSegmented
+          label="Colour mode"
+          value={t.mode}
+          onChange={(m) => void switchTheme(() => theme.setColorMode(m))}
+          options={MODES}
+        />
+      </Row>
+      <Row title="Light theme">
+        <Choice
+          label="Light theme"
+          value={nameFor(t, "light")}
+          options={themeOptions("light")}
+          onChange={(v) => void switchTheme(() => theme.setThemeNameForScheme("light", v), v)}
+        />
+      </Row>
+      <Row title="Dark theme">
+        <Choice
+          label="Dark theme"
+          value={nameFor(t, "dark")}
+          options={themeOptions("dark")}
+          onChange={(v) => void switchTheme(() => theme.setThemeNameForScheme("dark", v), v)}
+        />
+      </Row>
+      <Row title="Code size">
+        <Stepper value={size} min={11} max={16} step={0.5} onChange={(fontSize) => st.setPrefs({ fontSize })} />
+      </Row>
+    </Group>
   );
 }
 
@@ -196,50 +210,46 @@ function Diff() {
   const style = st.useStore((s) => s.style);
   const p = st.useStore((s) => s.prefs);
   return (
-    <>
-      <Group title="Layout">
-        <Row title="Layout" hint="Side by side, or old and new lines together. s switches it.">
-          <TextSegmented
-            label="Diff layout"
-            value={style}
-            onChange={(v) => st.set({ style: v })}
-            options={[
-              { value: "split", label: "Split" },
-              { value: "unified", label: "Unified" },
-            ]}
-          />
-        </Row>
-        <Row title="Wrap long lines" hint="Off, long lines scroll sideways.">
-          <Switch label="Wrap long lines" on={p.wrap} onChange={(wrap) => st.setPrefs({ wrap })} />
-        </Row>
-      </Group>
-      <Group title="Changes">
-        <Row title="Changed lines" hint="How the gutter marks added and removed lines.">
-          <TextSegmented<Prefs["indicators"]>
-            label="Changed line markers"
-            value={p.indicators}
-            onChange={(indicators) => st.setPrefs({ indicators })}
-            options={[
-              { value: "bars", label: "Bars" },
-              { value: "classic", label: "+ −" },
-              { value: "none", label: "None" },
-            ]}
-          />
-        </Row>
-        <Row title="Changes within a line" hint="Highlight what changed inside a changed line.">
-          <TextSegmented<Prefs["inlineChanges"]>
-            label="Changes within a line"
-            value={p.inlineChanges}
-            onChange={(inlineChanges) => st.setPrefs({ inlineChanges })}
-            options={[
-              { value: "word", label: "Words" },
-              { value: "char", label: "Characters" },
-              { value: "none", label: "Off" },
-            ]}
-          />
-        </Row>
-      </Group>
-    </>
+    <Group>
+      <Row title="Layout" keys="s">
+        <TextSegmented
+          label="Diff layout"
+          value={style}
+          onChange={(v) => st.set({ style: v })}
+          options={[
+            { value: "split", label: "Split" },
+            { value: "unified", label: "Unified" },
+          ]}
+        />
+      </Row>
+      <Row title="Wrap long lines">
+        <Switch label="Wrap long lines" on={p.wrap} onChange={(wrap) => st.setPrefs({ wrap })} />
+      </Row>
+      <Row title="Line markers">
+        <TextSegmented<Prefs["indicators"]>
+          label="Changed line markers"
+          value={p.indicators}
+          onChange={(indicators) => st.setPrefs({ indicators })}
+          options={[
+            { value: "bars", label: "Bars" },
+            { value: "classic", label: "+ −" },
+            { value: "none", label: "None" },
+          ]}
+        />
+      </Row>
+      <Row title="Inline changes">
+        <TextSegmented<Prefs["inlineChanges"]>
+          label="Changes within a line"
+          value={p.inlineChanges}
+          onChange={(inlineChanges) => st.setPrefs({ inlineChanges })}
+          options={[
+            { value: "word", label: "Words" },
+            { value: "char", label: "Characters" },
+            { value: "none", label: "Off" },
+          ]}
+        />
+      </Row>
+    </Group>
   );
 }
 
@@ -261,41 +271,20 @@ function statusOf(name: string, a: Status, usingKey: boolean) {
     : { tone: "bg-orange", text: "Not signed in" };
 }
 
-/** One reviewer to pick: its name, who makes it, and whether it's ready. */
-function ReviewerCard(o: {
-  name: string;
-  maker: string;
-  selected: boolean;
-  status: { tone: string; text: string };
-  onPick: () => void;
-}) {
+/** A sign-in status: a dot and a few words, with a refresh. */
+function Status({ status, onCheck }: { status: { tone: string; text: string }; onCheck: () => void }) {
   return (
-    <button
-      type="button"
-      aria-pressed={o.selected}
-      onClick={o.onPick}
-      className={`flex flex-1 flex-col items-start gap-2.5 rounded-card px-4 py-3.5 text-left transition-[box-shadow,background-color] duration-150 ${
-        o.selected
-          ? "bg-accent-tint shadow-[inset_0_0_0_1.5px_var(--accent)]"
-          : "bg-inset shadow-[inset_0_0_0_1px_var(--line)] [@media(hover:hover)]:hover:shadow-[inset_0_0_0_1px_var(--line-strong)]"
-      }`}
-    >
-      <span className="flex w-full items-center gap-2">
-        <span className="text-[13.5px] font-medium text-ink">{o.name}</span>
-        <span className="text-[12px] text-ink-3">{o.maker}</span>
-        <span
-          className={`ml-auto flex size-4 items-center justify-center rounded-full ${o.selected ? "bg-accent text-white" : "shadow-[inset_0_0_0_1.5px_var(--line-strong)]"}`}
-        >
-          {o.selected ? <Check width={11} height={11} strokeWidth={2.5} /> : null}
-        </span>
-      </span>
-      <span className="flex items-center gap-1.5 text-[12px] text-ink-2">
-        <span className={`size-1.5 rounded-full ${o.status.tone}`} />
-        {o.status.text}
-      </span>
-    </button>
+    <span className="flex items-center gap-2 text-[12.5px] text-ink-2">
+      <span className={`size-1.5 rounded-full ${status.tone}`} />
+      {status.text}
+      <IconButton label="Check again" onClick={onCheck}>
+        <Refresh />
+      </IconButton>
+    </span>
   );
 }
+
+const cmd = (text: string) => <code className="font-mono text-ink-2">{text}</code>;
 
 /**
  * Who reads the code with you: Claude Code or Codex. Each runs the one you installed, on your
@@ -303,43 +292,41 @@ function ReviewerCard(o: {
  */
 function Reviewer() {
   const p = st.useStore((s) => s.prefs);
-  const [claude, setClaude] = useState<Status>(null);
-  const [codex, setCodex] = useState<Status>(null);
+  const claudeQ = useQuery(claudeAuthQuery);
+  const codexQ = useQuery(codexAuthQuery);
+  const claude: Status = claudeQ.data ?? null;
+  const codex: Status = codexQ.data ?? null;
   const check = () => {
-    void api.auth().then(setClaude, () => {});
-    void api.codexAuth().then(setCodex, () => {});
+    void claudeQ.refetch();
+    void codexQ.refetch();
   };
-  useEffect(check, []);
   const claudeStatus = statusOf("Claude Code", claude, p.auth === "apiKey");
   const codexStatus = statusOf("Codex", codex, p.codexAuth === "apiKey");
   return (
     <>
-      <fieldset aria-label="AI provider" className="mt-1 flex gap-3">
-        <ReviewerCard
-          name="Claude Code"
-          maker="Anthropic"
-          selected={p.reviewer === "claude"}
-          status={claudeStatus}
-          onPick={() => st.setPrefs({ reviewer: "claude" })}
-        />
-        <ReviewerCard
-          name="Codex"
-          maker="OpenAI"
-          selected={p.reviewer === "codex"}
-          status={codexStatus}
-          onPick={() => st.setPrefs({ reviewer: "codex" })}
-        />
-      </fieldset>
+      <Group>
+        <Row title="Provider">
+          <TextSegmented<Prefs["reviewer"]>
+            label="AI provider"
+            value={p.reviewer}
+            onChange={(reviewer) => st.setPrefs({ reviewer })}
+            options={[
+              { value: "claude", label: "Claude Code" },
+              { value: "codex", label: "Codex" },
+            ]}
+          />
+        </Row>
+      </Group>
 
       {p.reviewer === "claude" ? (
         <Group title="Claude Code">
-          <Row title="Sign in with" hint="Claude Code's own login, or an Anthropic API key you save here.">
+          <Row title="Sign in with">
             <TextSegmented<Prefs["auth"]>
               label="Claude sign in"
               value={p.auth}
               onChange={(a) => st.setPrefs({ auth: a })}
               options={[
-                { value: "login", label: "Claude account" },
+                { value: "login", label: "Account" },
                 { value: "apiKey", label: "API key" },
               ]}
             />
@@ -348,32 +335,33 @@ function Reviewer() {
             <Row
               title="Account"
               hint={
-                <>
-                  To sign in or switch accounts, run <code className="font-mono">claude</code> in a terminal and type{" "}
-                  <code className="font-mono">/login</code>.
-                </>
+                claude && !claude.installed ? (
+                  <>Install Claude Code, then sign in.</>
+                ) : claude && !claude.loggedIn ? (
+                  <>
+                    Run {cmd("claude")}, then {cmd("/login")}
+                  </>
+                ) : undefined
               }
             >
-              <Button tone="secondary" onClick={check}>
-                Check again
-              </Button>
+              <Status status={claudeStatus} onCheck={check} />
             </Row>
           ) : (
-            <Row title="API key" hint="Kept in your keychain; billed to its Anthropic Console account.">
+            <Row title="API key">
               <KeyField
                 label="Anthropic API key"
                 placeholder="sk-ant-…"
-                missing="No key saved yet: Claude stops until you add one."
+                missing="No key saved"
                 saved={!!claude?.hasKey}
                 store={async (key) => {
                   const { hasKey } = await api.saveClaudeKey(key);
-                  setClaude((a) => (a ? { ...a, hasKey } : a));
+                  queryClient.setQueryData(claudeAuthQuery.queryKey, (a) => (a ? { ...a, hasKey } : a));
                   return hasKey;
                 }}
               />
             </Row>
           )}
-          <Row title="Model" hint="Default is Claude Code's own choice.">
+          <Row title="Model">
             <Choice<Prefs["model"]>
               label="Claude model"
               value={p.model}
@@ -386,7 +374,7 @@ function Reviewer() {
               ]}
             />
           </Row>
-          <Row title="Effort" hint="Default answers questions at low effort, for speed, and co-reviews deeper.">
+          <Row title="Effort">
             <Choice<Prefs["effort"]>
               label="Claude effort"
               value={p.effort}
@@ -403,14 +391,14 @@ function Reviewer() {
           </Row>
         </Group>
       ) : (
-        <Group title="Codex" note="Applying comments uses Claude Code for now; Codex answers, orders and co-reviews.">
-          <Row title="Sign in with" hint="Codex's own login, or an OpenAI API key you save here.">
+        <Group title="Codex" note="Applying comments still uses Claude Code.">
+          <Row title="Sign in with">
             <TextSegmented<Prefs["codexAuth"]>
               label="Codex sign in"
               value={p.codexAuth}
               onChange={(codexAuth) => st.setPrefs({ codexAuth })}
               options={[
-                { value: "login", label: "ChatGPT account" },
+                { value: "login", label: "ChatGPT" },
                 { value: "apiKey", label: "API key" },
               ]}
             />
@@ -420,45 +408,38 @@ function Reviewer() {
               title="Account"
               hint={
                 codex && !codex.installed ? (
-                  <>
-                    Install it with <code className="font-mono">npm i -g @openai/codex</code> or{" "}
-                    <code className="font-mono">brew install codex</code>, then sign in.
-                  </>
-                ) : (
-                  <>
-                    To sign in or switch accounts, run <code className="font-mono">codex login</code> in a terminal.
-                  </>
-                )
+                  <>Install it: {cmd("brew install codex")}</>
+                ) : codex && !codex.loggedIn ? (
+                  <>Run {cmd("codex login")}</>
+                ) : undefined
               }
             >
-              <Button tone="secondary" onClick={check}>
-                Check again
-              </Button>
+              <Status status={codexStatus} onCheck={check} />
             </Row>
           ) : (
-            <Row title="API key" hint="Kept in your keychain; billed to its OpenAI account.">
+            <Row title="API key">
               <KeyField
                 label="OpenAI API key"
                 placeholder="sk-…"
-                missing="No key saved yet: Codex stops until you add one."
+                missing="No key saved"
                 saved={!!codex?.hasKey}
                 store={async (key) => {
                   const { hasKey } = await api.saveCodexKey(key);
-                  setCodex((a) => (a ? { ...a, hasKey } : a));
+                  queryClient.setQueryData(codexAuthQuery.queryKey, (a) => (a ? { ...a, hasKey } : a));
                   return hasKey;
                 }}
               />
             </Row>
           )}
-          <Row title="Model" hint="Empty is Codex's own default.">
+          <Row title="Model">
             <TextField
               label="Codex model"
               value={p.codexModel}
-              placeholder="Codex's default"
+              placeholder="Default"
               onSave={(codexModel) => st.setPrefs({ codexModel })}
             />
           </Row>
-          <Row title="Reasoning" hint="Default reasons lightly for questions, for speed, and deeper for co-review.">
+          <Row title="Reasoning">
             <Choice<Prefs["codexEffort"]>
               label="Codex reasoning effort"
               value={p.codexEffort}
@@ -475,8 +456,8 @@ function Reviewer() {
         </Group>
       )}
 
-      <Group title="Co-review">
-        <Row title="Nitpicks" hint="Off, co-review proposes only issues and suggestions that matter.">
+      <Group>
+        <Row title="Nitpicks in co-review">
           <Switch label="Nitpicks in co-review" on={p.nits} onChange={(nits) => st.setPrefs({ nits })} />
         </Row>
       </Group>
@@ -520,12 +501,13 @@ function KeyField({
   missing?: string;
 }) {
   const [text, setText] = useState("");
-  const [state, setState] = useState<{ ok?: string; error?: string }>({});
+  const [state, setState] = useState<{ error?: string }>({});
   const save = async (key: string | null) => {
     try {
       const has = await store(key);
       setText("");
-      setState({ ok: has ? "Saved to your keychain" : "Removed" });
+      setState({});
+      st.toast(has ? "Saved to your keychain" : "Key removed");
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : "Couldn't save the key." });
     }
@@ -557,58 +539,40 @@ function KeyField({
           </Button>
         ) : null}
       </div>
-      <div className="mt-1 h-4 truncate text-[11.5px]">
-        {state.error ? (
-          <span className="text-red">{state.error}</span>
-        ) : state.ok ? (
-          <span className="text-green">{state.ok}</span>
-        ) : !saved && missing ? (
-          <span className="text-orange">{missing}</span>
-        ) : null}
-      </div>
+      {state.error || (!saved && missing) ? (
+        <div className={`mt-1 truncate text-[11.5px] ${state.error ? "text-red" : "text-orange"}`}>
+          {state.error ?? missing}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function GitHub() {
-  const [a, setA] = useState<GitHubAccount | null | undefined>(undefined);
-  useEffect(() => {
-    void api.githubAccount().then(setA, () => setA(null));
-  }, []);
+  const q = useQuery(githubAccountQuery);
+  // No answer means no GitHub remote: the server only fails this when there's no repo to ask about.
+  const a = q.isError ? null : q.data;
   if (a === undefined) return <p className="py-4 text-[12.5px] text-ink-3">Checking your GitHub login…</p>;
   if (a === null) return <p className="py-4 text-[12.5px] text-ink-3">This repo has no GitHub remote.</p>;
-  const via = a.source === "nit" ? "with the token saved in nit" : "through the GitHub CLI";
+  const via = a.source === "nit" ? "token" : "GitHub CLI";
+  const status = a.login
+    ? { tone: "bg-green", text: `${a.login} · ${via}` }
+    : a.source
+      ? { tone: "bg-red", text: `The ${via} login was refused` }
+      : { tone: "bg-orange", text: "Not signed in" };
   return (
     <Group>
-      <Row
-        title="Account"
-        hint={
-          a.login ? (
-            `Signed in as ${a.login} on ${a.host}, ${via}.`
-          ) : a.source ? (
-            `GitHub didn't accept the token ${via}.`
-          ) : (
-            <>
-              Not signed in. Run <code className="font-mono">gh auth login</code> in a terminal, or save a token below.
-            </>
-          )
-        }
-      >
-        <Button tone="secondary" onClick={() => void api.githubAccount().then(setA, () => {})}>
-          Check again
-        </Button>
+      <Row title="Account" hint={a.login ? undefined : <>Run {cmd("gh auth login")}, or add a token</>}>
+        <Status status={status} onCheck={() => void q.refetch()} />
       </Row>
-      <Row
-        title="Token"
-        hint={`Optional, for ${a.host}: kept in your keychain, and used instead of the GitHub CLI's login. It needs access to the repo's pull requests.`}
-      >
+      <Row title="Token" hint={a.saved ? undefined : "Optional · used instead of the CLI login"}>
         <KeyField
           label="GitHub token"
           placeholder="github_pat_…"
           saved={a.saved}
           store={async (token) => {
             const next = await api.saveGitHubToken(token);
-            setA(next);
+            queryClient.setQueryData(githubAccountQuery.queryKey, next);
             return next.saved;
           }}
         />
@@ -618,26 +582,17 @@ function GitHub() {
 }
 
 function Linear() {
-  const [hasKey, setHasKey] = useState<boolean | undefined>(undefined);
-  useEffect(() => {
-    void api.linearKey().then(
-      (r) => setHasKey(r.hasKey),
-      () => setHasKey(false),
-    );
-  }, []);
+  const hasKey = useQuery(linearKeyQuery).data?.hasKey;
   return (
     <Group>
-      <Row
-        title="API key"
-        hint="Optional: with a personal API key (Linear → Settings → Security & access), the issue a branch is for shows with its pull request. Kept in your keychain."
-      >
+      <Row title="API key" hint="Shows a branch's issue with its pull request">
         <KeyField
           label="Linear API key"
           placeholder="lin_api_…"
           saved={!!hasKey}
           store={async (key) => {
             const r = await api.saveLinearKey(key);
-            setHasKey(r.hasKey);
+            queryClient.setQueryData(linearKeyQuery.queryKey, r);
             void st.loadGitHub();
             return r.hasKey;
           }}
@@ -662,12 +617,13 @@ function CommandField({
   onSaved: (s: CommandSettings) => void;
 }) {
   const [text, setText] = useState(setting.yours ?? "");
-  const [state, setState] = useState<{ saved?: boolean; error?: string }>({});
+  const [state, setState] = useState<{ error?: string }>({});
   const save = async () => {
     if (text.trim() === (setting.yours ?? "")) return;
     try {
       onSaved(await api.saveCommands({ [name]: text.trim() || null }));
-      setState({ saved: true });
+      setState({});
+      st.toast("Saved");
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : "Couldn't save." });
     }
@@ -691,76 +647,52 @@ function CommandField({
         aria-label={`${name} command`}
         className="h-7 w-full rounded-control bg-field px-2.5 font-mono text-[12px] text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-3 focus:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_var(--accent-tint)] disabled:opacity-60"
       />
-      <div className="mt-1 h-4 truncate text-[11.5px] text-ink-3">
-        {state.error ? (
-          <span className="text-red">{state.error}</span>
-        ) : state.saved ? (
-          <span className="text-green">Saved</span>
-        ) : overridden ? (
-          <span title={overridden.run}>
-            In this repo: <code className="font-mono">{overridden.run}</code> from {overridden.from}
-          </span>
-        ) : null}
-      </div>
+      {state.error ? (
+        <div className="mt-1 truncate text-[11.5px] text-red">{state.error}</div>
+      ) : overridden ? (
+        <div className="mt-1 truncate text-[11.5px] text-ink-3" title={overridden.run}>
+          This repo uses <code className="font-mono">{overridden.run}</code> ({overridden.from})
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function Commands() {
-  const [s, setS] = useState<CommandSettings | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    void api.commands().then(setS, (e) => setError(e instanceof Error ? e.message : String(e)));
-  }, []);
-  if (error) return <p className="py-4 text-[12.5px] text-red">{error}</p>;
+  const q = useQuery(commandsQuery);
+  const s = q.data;
+  const saved = (next: CommandSettings) => queryClient.setQueryData(commandsQuery.queryKey, next);
+  if (q.error) return <p className="py-4 text-[12.5px] text-red">{q.error.message}</p>;
   if (!s) return <p className="py-4 text-[12.5px] text-ink-3">Reading your config…</p>;
   return (
-    <>
-      <p className="pb-2 text-[12px] leading-[17px] text-ink-3">
-        Saved to <code className="font-mono text-ink-2">{s.file}</code>, for every repo. A repo's{" "}
-        <code className="font-mono">.nit.toml</code> or your <code className="font-mono">.nit.local.toml</code> can
-        override them there.
-        {s.editable ? null : (
-          <span className="text-orange"> That file has more than [commands] in it, so edit it by hand.</span>
-        )}
-      </p>
-      <Group>
-        <Row
-          title="Editor"
-          hint={
-            <>
-              Opens a file at a line (o). <code className="font-mono">{"{file}"}</code> and{" "}
-              <code className="font-mono">{"{line}"}</code> are filled in. Empty uses VS Code, else your OS.
-            </>
-          }
-        >
-          <CommandField
-            name="editor"
-            setting={s.editor}
-            placeholder="zed {file}:{line}"
-            editable={s.editable}
-            onSaved={setS}
-          />
-        </Row>
-        <Row
-          title="Checkout"
-          hint={
-            <>
-              Checks out a pull request you review by URL: gets <code className="font-mono">$NIT_PR</code> and{" "}
-              <code className="font-mono">$NIT_BRANCH</code>, prints the directory. Empty uses a git worktree.
-            </>
-          }
-        >
-          <CommandField
-            name="checkout"
-            setting={s.checkout}
-            placeholder="crbn checkout $NIT_PR"
-            editable={s.editable}
-            onSaved={setS}
-          />
-        </Row>
-      </Group>
-    </>
+    <Group
+      note={
+        s.editable ? (
+          <>Saved to {cmd(s.file)}</>
+        ) : (
+          <span className="text-orange">{cmd(s.file)} has more than [commands] in it: edit it by hand</span>
+        )
+      }
+    >
+      <Row title="Editor" keys="o">
+        <CommandField
+          name="editor"
+          setting={s.editor}
+          placeholder="zed {file}:{line}"
+          editable={s.editable}
+          onSaved={saved}
+        />
+      </Row>
+      <Row title="Checkout">
+        <CommandField
+          name="checkout"
+          setting={s.checkout}
+          placeholder="crbn checkout $NIT_PR"
+          editable={s.editable}
+          onSaved={saved}
+        />
+      </Row>
+    </Group>
   );
 }
 
@@ -773,7 +705,6 @@ const SECTIONS = [
     label: "Appearance",
     icon: <ColorFilter />,
     body: Appearance,
-    about: "How nit and its code look.",
   },
   {
     id: "diff",
@@ -781,7 +712,6 @@ const SECTIONS = [
     label: "Diff",
     icon: <GitCompare />,
     body: Diff,
-    about: "How changes are laid out and marked.",
   },
   {
     id: "commands",
@@ -789,7 +719,6 @@ const SECTIONS = [
     label: "Commands",
     icon: <Code />,
     body: Commands,
-    about: "Your editor, and how pull requests are checked out.",
   },
   {
     id: "reviewer",
@@ -797,7 +726,6 @@ const SECTIONS = [
     label: "AI",
     icon: <Sparks />,
     body: Reviewer,
-    about: "Who answers your questions, suggests a reading order and co-reviews. Only when you ask.",
   },
   {
     id: "github",
@@ -805,7 +733,6 @@ const SECTIONS = [
     label: "GitHub",
     icon: <GitHubIcon />,
     body: GitHub,
-    about: "For pull requests: their threads, checks and posting your review.",
   },
   {
     id: "linear",
@@ -813,7 +740,6 @@ const SECTIONS = [
     label: "Linear",
     icon: <Page />,
     body: Linear,
-    about: "The issue a branch is for, shown with its pull request.",
   },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -838,7 +764,7 @@ export function SettingsDialog() {
     <Dialog.Root open={open} onOpenChange={(o) => st.set({ settingsOpen: o })}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-[oklch(0_0_0/0.28)] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex h-[min(600px,calc(100vh-48px))] w-[min(820px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-window bg-surface shadow-overlay outline-none transition-[opacity,scale] duration-150 ease-out-strong data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex h-[min(540px,calc(100vh-48px))] w-[min(760px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-window bg-surface shadow-overlay outline-none transition-[opacity,scale] duration-150 ease-out-strong data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
           <nav
             aria-label="Settings sections"
             className="flex w-[184px] shrink-0 flex-col gap-0.5 bg-inset p-2 shadow-[1px_0_0_var(--line)]"
@@ -867,16 +793,11 @@ export function SettingsDialog() {
                 </button>
               </Fragment>
             ))}
-            <span className="mt-auto px-2 pb-1 text-[11.5px] leading-4 text-ink-3">Changes save as you make them.</span>
           </nav>
           <section className="flex min-w-0 flex-1 flex-col">
-            <header className="flex shrink-0 items-start gap-2 px-6 pt-4 pb-3">
-              <div className="min-w-0">
-                <h2 className="text-[15px] font-semibold text-ink">{current.label}</h2>
-                <p className="mt-0.5 text-[12.5px] text-ink-3">{current.about}</p>
-              </div>
+            <header className="flex h-13 shrink-0 items-center gap-2 px-6">
+              <h2 className="text-[15px] font-semibold text-ink">{current.label}</h2>
               <span className="ml-auto flex items-center gap-1">
-                <Kbd k="Esc" quiet />
                 <Dialog.Close
                   render={
                     <IconButton label="Close" keys="Esc">

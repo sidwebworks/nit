@@ -6,7 +6,6 @@ import {
   DEFAULT_PREFS,
   type Draft,
   type FileCategory,
-  type FileContents,
   type GitHubState,
   type Job,
   type LinearLink,
@@ -14,10 +13,11 @@ import {
   type Prefs,
   type ReviewData,
   type Side,
-  type Symbol as Sym,
 } from "../types";
 import { api } from "./api";
 import { inTreeOrder, type Row, rows } from "./lines";
+import { fileQuery, queryClient } from "./query";
+import { applySharedTheme } from "./theme";
 import { toasts } from "./toasts";
 
 export type Point = { side: Side; line: number };
@@ -54,8 +54,6 @@ export type Peek = {
     }
 );
 
-export type Outline = { new: Sym[] | null; old: Sym[] | null; oldLoaded: boolean };
-
 export type State = {
   data: ReviewData | null;
   error: string | null;
@@ -80,7 +78,8 @@ export type State = {
   palette: "all" | "files" | "symbols" | null;
   peek: Peek | null;
   /** Symbols per file path, from the server's tree-sitter parse. */
-  outlines: Record<string, Outline>;
+  /** The review's version (a hash of its diff): what cached server data is keyed by. */
+  rev: string;
   outlineOpen: boolean;
   /** The review sheet: every draft by file, before posting. */
   reviewOpen: boolean;
@@ -155,7 +154,7 @@ let state: State = {
   saving: {},
   palette: null,
   peek: null,
-  outlines: {},
+  rev: "",
   outlineOpen: savedLayout.outlineOpen ?? stored("nit.outline") !== "0",
   reviewOpen: false,
   settingsOpen: false,
@@ -200,7 +199,7 @@ export const subscribeToStore = subscribe;
 export const currentFile = (s = state) => s.files[s.current];
 
 /** FNV-1a over the text; enough to tell one patch from the next. */
-function hashOf(text: string) {
+export function hashOf(text: string) {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
   return (h >>> 0).toString(36);
@@ -208,16 +207,8 @@ function hashOf(text: string) {
 
 // ---------- file contents (full old/new text, for context expansion and comment anchors)
 
-const contents = new Map<string, Promise<FileContents>>();
 export function fileContents(file: FileDiffMetadata) {
-  const key = `${file.prevName ?? ""}>${file.name}`;
-  let p = contents.get(key);
-  if (!p) {
-    p = api.file(file.name, file.prevName);
-    p.catch(() => contents.delete(key));
-    contents.set(key, p);
-  }
-  return p;
+  return queryClient.ensureQueryData(fileQuery(state.rev, file.name, file.prevName));
 }
 
 /** Swaps a parsed patch for one that also carries both files' full text, so unchanged lines can expand. */
@@ -253,7 +244,6 @@ export async function load() {
     const data = await api.review(state.prefs.hideWhitespace);
     // Coming back to the tab reloads; an unchanged patch keeps the hydrated files and outlines.
     const same = data.patch === state.data?.patch;
-    if (!same) contents.clear();
     // In tree order, so next/previous file walks the sidebar top to bottom.
     const files = same
       ? state.files
@@ -298,7 +288,7 @@ export async function load() {
         changedSinceViewed: new Set(data.changedSinceViewed),
         categories: data.categories,
         asks: data.asks,
-        outlines: same ? s.outlines : {}, // changed files re-read their symbols on demand
+        rev: same ? s.rev : hashOf(data.patch), // a new diff: cached file data is read afresh
         error: null,
       };
     });
@@ -470,16 +460,33 @@ export function fail(message: string) {
 }
 
 let savePrefs: ReturnType<typeof setTimeout> | undefined;
+let prefsInFlight = 0;
 /** Changes preferences at once and saves them shortly after (a slider sends one save, not twenty). */
 export function setPrefs(patch: Partial<Prefs>) {
   const respace = "hideWhitespace" in patch && patch.hideWhitespace !== state.prefs.hideWhitespace;
   set((s) => ({ prefs: { ...s.prefs, ...patch } }));
   if (respace) void load(); // a different diff to read
   clearTimeout(savePrefs);
-  savePrefs = setTimeout(
-    () => api.savePrefs(state.prefs).catch(() => fail("Couldn't save your settings. Is nit still running?")),
-    300,
-  );
+  prefsInFlight++;
+  savePrefs = setTimeout(() => {
+    void api
+      .savePrefs(state.prefs)
+      .catch(() => fail("Couldn't save your settings. Is nit still running?"))
+      .finally(() => prefsInFlight--);
+  }, 300);
+}
+
+/**
+ * Settings saved in another tab or another repo's nit (they're shared by every nit), as they
+ * stand now. An edit made here that's still being saved wins: it's the newer one, and its own
+ * echo arrives right after.
+ */
+export function applySharedSettings(prefs: Prefs, savedTheme: unknown) {
+  applySharedTheme(savedTheme);
+  if (prefsInFlight || JSON.stringify(prefs) === JSON.stringify(state.prefs)) return;
+  const respace = prefs.hideWhitespace !== state.prefs.hideWhitespace;
+  set({ prefs });
+  if (respace) void load();
 }
 
 /** Whether the file list sets this file aside (Hide generated / tests / docs / viewed). */

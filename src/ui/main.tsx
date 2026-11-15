@@ -1,5 +1,6 @@
 import { Toast } from "@base-ui/react/toast";
 import { EditProvider } from "@pierre/diffs/react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { IconoirProvider } from "iconoir-react";
 import { Check, GitCompare, WarningCircle } from "iconoir-react/regular";
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ import { OutlinePanel } from "./Outline";
 import { Palette } from "./Palette";
 import { PullRequestSheet } from "./PullRequest";
 import { HighlightPool } from "./pool";
+import { queryClient } from "./query";
 import { ReviewSheet } from "./ReviewSheet";
 import { SearchPane } from "./Search";
 import { SettingsDialog } from "./Settings";
@@ -155,16 +157,18 @@ codeSize();
 st.subscribeToStore(codeSize);
 
 createRoot(document.getElementById("root")!).render(
-  <IconoirProvider iconProps={ICONS}>
-    <TooltipProvider>
-      <Toast.Provider toastManager={toasts} limit={3}>
-        <HighlightPool>
-          <EditProvider createEditor={createEditor}>
-            <App />
-          </EditProvider>
-        </HighlightPool>
-        <Toasts />
-      </Toast.Provider>
-    </TooltipProvider>
-  </IconoirProvider>,
+  <QueryClientProvider client={queryClient}>
+    <IconoirProvider iconProps={ICONS}>
+      <TooltipProvider>
+        <Toast.Provider toastManager={toasts} limit={3}>
+          <HighlightPool>
+            <EditProvider createEditor={createEditor}>
+              <App />
+            </EditProvider>
+          </HighlightPool>
+          <Toasts />
+        </Toast.Provider>
+      </TooltipProvider>
+    </IconoirProvider>
+  </QueryClientProvider>,
 );

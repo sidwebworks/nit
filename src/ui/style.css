@@ -432,3 +432,25 @@ pre[style*="--hls-dark"] span {
     transition-duration: 0ms !important;
   }
 }
+
+/* A theme switch (theme.ts switchTheme): every colour changes in the same frame, and the
+   page crossfades once instead of each control fading on its own. */
+[data-theme-switch] *,
+[data-theme-switch] *::before,
+[data-theme-switch] *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat every component's transition */
+  transition: none !important;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* No italics anywhere: syntax themes italicise comments and keywords, markdown its emphasis. */
+*,
+*::before,
+*::after {
+  /* biome-ignore lint/complexity/noImportantStyles: beats themes' inline token styles */
+  font-style: normal !important;
+}

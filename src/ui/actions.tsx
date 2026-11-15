@@ -28,6 +28,7 @@ import {
 } from "iconoir-react/regular";
 import type { ReactNode } from "react";
 import * as agent from "./agent";
+import { openTreeSearch } from "./ChangedTree";
 import * as nav from "./nav";
 import * as st from "./state";
 import * as suggest from "./suggest";
@@ -297,6 +298,20 @@ export const actions: Action[] = [
     keys: ["p"],
     icon: <NavArrowUp />,
     run: () => st.nextChange(-1),
+  },
+  {
+    id: "filter-files",
+    group: "Navigate",
+    label: "Filter the file list",
+    keys: ["/"],
+    icon: <Page />,
+    run: () => {
+      // At once when the tree is on screen, so the letters typed right after / land in the box.
+      if (openTreeSearch && st.get().sidebar) return openTreeSearch();
+      st.set({ sidebar: true });
+      // The reading-order list has no filter; Go to file covers it there.
+      requestAnimationFrame(() => (openTreeSearch ? openTreeSearch() : st.set({ palette: "files" })));
+    },
   },
   {
     id: "files",

@@ -4,6 +4,7 @@ import { type ReactNode, useDeferredValue, useEffect, useLayoutEffect, useMemo, 
 import { actions, available } from "./actions";
 import { stats } from "./lines";
 import * as nav from "./nav";
+import { useOutline } from "./query";
 import * as st from "./state";
 import { basename, dirname, fuzzy, Kbd, paintMatches } from "./ui";
 
@@ -26,10 +27,8 @@ export function Palette() {
 
 function PaletteWindow({ mode: opened }: { mode: "all" | "files" | "symbols" }) {
   const files = st.useStore((s) => s.files);
-  const outline = st.useStore((s) => {
-    const f = st.currentFile(s);
-    return f ? s.outlines[f.name] : undefined;
-  });
+  const current = st.useStore((s) => st.currentFile(s));
+  const outline = useOutline(current?.name, current?.prevName);
   const [query, setQuery] = useState(opened === "symbols" ? "@" : "");
   // Typing @ switches to the current file's symbols, as in editors.
   const mode = query.startsWith("@") ? "symbols" : opened === "symbols" ? "all" : opened;

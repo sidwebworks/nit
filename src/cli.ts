@@ -37,7 +37,7 @@ import { createSnapshots } from "./snapshot";
 import { openStore } from "./store";
 import * as term from "./term";
 import { themeBoot } from "./theme-boot";
-import type { AskThread, Draft, FileContents, GuideChapter, ReviewData, ReviewEvent, Side } from "./types";
+import type { AgentEvent, AskThread, Draft, FileContents, GuideChapter, ReviewData, ReviewEvent, Side } from "./types";
 
 const dev = process.env.NIT_DEV === "1";
 const uiDir = uiDirFor(dev);
@@ -198,6 +198,32 @@ const IMAGE_TYPES: Record<string, string> = {
   svg: "image/svg+xml",
 };
 
+/** What every open page hears live, over its WebSocket (/api/live). */
+const LIVE = "live";
+const publish = (e: AgentEvent) => server?.publish(LIVE, JSON.stringify(e));
+
+/**
+ * Preferences and the theme are shared by every nit (one database). When they change, here or in
+ * another repo's nit, every open page takes the change without a reload. Another process's write
+ * shows up as a new `data_version`, checked once a second; only a real change to these is sent.
+ */
+const settingsNow = () => ({ prefs: prefsOf(store), theme: store.setting("theme") });
+let sentSettings = JSON.stringify(settingsNow());
+function pushSettings() {
+  const now = settingsNow();
+  const key = JSON.stringify(now);
+  if (key === sentSettings) return;
+  sentSettings = key;
+  publish({ type: "settings", ...now });
+}
+let dataVersion = store.dataVersion();
+setInterval(() => {
+  const v = store.dataVersion();
+  if (v === dataVersion) return;
+  dataVersion = v;
+  pushSettings();
+}, 1000);
+
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 
@@ -327,8 +353,16 @@ const serve = (p: number) =>
     hostname: "127.0.0.1",
     port: p,
     development: false,
-    // The agent's event stream stays open; it sends a heartbeat well inside this.
     idleTimeout: 60,
+    // A page's live connection: what already happened in the current agent run, then everything
+    // as it happens (the agent's events, settings changed elsewhere). Bun pings it to keep it up.
+    websocket: {
+      open(ws) {
+        ws.subscribe(LIVE);
+        for (const e of agent.replay()) ws.send(JSON.stringify(e));
+      },
+      message() {}, // the page only listens
+    },
     // Never send stack traces to the page; log them where the user started nit.
     error(e) {
       term.error(e);
@@ -762,38 +796,15 @@ const serve = (p: number) =>
       "/api/agent/changes": {
         GET: guarded(async () => new Response(await agent.changes(), { headers: { "content-type": "text/plain" } })),
       },
-      "/api/agent/events": {
-        // Server-sent events: what already happened in the current run, then everything live.
-        GET: guarded(async (req) => {
-          let off = () => {};
-          let beat: ReturnType<typeof setInterval> | undefined;
-          const stream = new ReadableStream({
-            start(controller) {
-              const send = (e: unknown) => controller.enqueue(`data: ${JSON.stringify(e)}\n\n`);
-              for (const e of agent.replay()) send(e);
-              off = agent.subscribe(send);
-              beat = setInterval(() => controller.enqueue(": keep-alive\n\n"), 20_000);
-              req.signal.addEventListener("abort", () => {
-                off();
-                clearInterval(beat);
-              });
-            },
-            cancel() {
-              off();
-              clearInterval(beat);
-            },
-          });
-          return new Response(stream, {
-            headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
-          });
-        }),
-      },
+      // The page's live connection: the agent's events and settings saved elsewhere (websocket below).
+      "/api/live": (req, srv) => guard(req) ?? (srv.upgrade(req) ? undefined : fail(400, "expected a WebSocket")),
       "/api/settings/prefs": {
         PUT: guarded(async (req) => {
           const patch = PrefsPatch.safeParse(await req.json().catch(() => null));
           if (!patch.success) return fail(400, "invalid preferences");
           const prefs = { ...prefsOf(store), ...patch.data };
           store.setSetting("prefs", prefs);
+          pushSettings();
           return json(prefs);
         }),
       },
@@ -895,6 +906,7 @@ const serve = (p: number) =>
             return fail(400, "invalid body");
           if (JSON.stringify(body).length > 64_000) return fail(413, "too large");
           for (const k of keys) store.setSetting(k, body[k]);
+          pushSettings();
           return json({ ok: true });
         }),
       },
@@ -951,6 +963,7 @@ try {
   server = serve(0); // taken, most likely by another review of the same repo
 }
 port = server.port!;
+agent.subscribe(publish);
 setToolBase(`http://127.0.0.1:${port}`);
 
 const url = `http://127.0.0.1:${server.port}`;

@@ -1,10 +1,12 @@
-import { ArrowRight, Copy, List, SidebarCollapse, SidebarExpand } from "iconoir-react/regular";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Copy, List, Search, SidebarCollapse, SidebarExpand } from "iconoir-react/regular";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ListRange, Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import type { Side } from "../types";
 import { changedLines } from "./lines";
 import { copy, type MenuItem, RightClick } from "./Menu";
 import * as nav from "./nav";
 import { buildOutline, type Entry, jumpTarget } from "./outline-model";
+import { useOutline } from "./query";
 import * as st from "./state";
 import { fuzzy, IconButton, paintMatches, Resizer, TextSegmented } from "./ui";
 
@@ -69,12 +71,16 @@ function symbolMenu(target: Element): MenuItem[] | null {
   ];
 }
 
+type Item = { entry: Entry; side: Side; removed?: boolean } | { heading: string };
+const ListPad = () => <div className="h-1.5" />;
+
 export function OutlinePanel() {
   const browse = st.useStore((s) => s.browse);
   // A file opened outside the review has symbols but no changes.
   const file = st.useStore((s) => (s.browse ? undefined : st.currentFile(s)));
   const path = browse?.path ?? file?.name;
-  const outline = st.useStore((s) => (path ? s.outlines[path] : undefined));
+  // A file opened outside the review has no diff to match, so no old side.
+  const outline = useOutline(path, file?.prevName, !browse);
   const reviewCursor = st.useStore((s) => s.cursor);
   const browseLine = browse?.line;
   const cursor = useMemo(
@@ -84,10 +90,6 @@ export function OutlinePanel() {
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [filter, setFilter] = useState("");
   const width = st.useStore((s) => s.widths.outline);
-
-  useEffect(() => {
-    if (file) nav.loadOutline(file.name, file.prevName);
-  }, [file]);
 
   const view = useMemo(() => {
     if (!outline) return null;
@@ -104,16 +106,36 @@ export function OutlinePanel() {
   // Filtering flattens the tree and ranks by fzf; matched letters are painted, not wrapped.
   const q = filter.trim();
   const found = useMemo(() => (q ? fuzzy(shown, q, (e) => e.name) : null), [shown, q]);
-  const rows = found ? found.map((r) => ({ ...r.item, depth: 0 })) : shown;
-  const listRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    paintMatches(
-      "nit-outline",
-      listRef.current,
-      new Map(found?.map((r) => [`${r.item.line}:${r.item.name}`, r.positions])),
-    );
-  }, [found]);
+  const rows = useMemo(() => (found ? found.map((r) => ({ ...r.item, depth: 0 })) : shown), [found, shown]);
+  // One virtualized list: a file can have thousands of symbols, and only the visible rows are drawn.
+  const items = useMemo<Item[]>(() => {
+    const removed = view?.removed ?? [];
+    return [
+      ...rows.map((entry) => ({ entry, side: "additions" as const })),
+      ...(removed.length ? [{ heading: "Removed" }] : []),
+      ...removed.map((s) => ({ entry: { ...s, depth: 0, status: null }, side: "deletions" as const, removed: true })),
+    ];
+  }, [rows, view]);
+  const scroller = useRef<HTMLElement | null>(null);
+  const list = useRef<VirtuosoHandle>(null);
+  const visible = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
+  // Matched letters are painted with CSS highlights; rows mount as they scroll in, so repaint then too.
+  const marks = useMemo(() => new Map(found?.map((r) => [`${r.item.line}:${r.item.name}`, r.positions])), [found]);
+  const paint = useCallback(() => paintMatches("nit-outline", scroller.current, marks), [marks]);
+  useEffect(() => paint(), [paint]);
   useEffect(() => () => void CSS.highlights?.delete("nit-outline"), []);
+  // Follow the cursor: the symbol it's in stays in view as you move through the code.
+  const hereIndex = here ? rows.findIndex((e) => e === here || (e.line === here.line && e.name === here.name)) : -1;
+  useEffect(() => {
+    if (hereIndex < 0) return;
+    // A frame later: when the outline has just arrived, the list takes its new rows first.
+    const id = requestAnimationFrame(() => {
+      const { startIndex, endIndex } = visible.current;
+      if (hereIndex < startIndex || hereIndex > endIndex)
+        list.current?.scrollToIndex({ index: hereIndex, align: "center" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [hereIndex]);
 
   return (
     <aside
@@ -154,7 +176,13 @@ export function OutlinePanel() {
         />
       </div>
 
-      <div className="shrink-0 px-2.5 pt-1.5 pb-1">
+      <div className="relative shrink-0 px-2.5 pt-1.5 pb-1">
+        <Search
+          width={13}
+          height={13}
+          strokeWidth={2}
+          className="pointer-events-none absolute top-1/2 left-[19px] mt-[2px] -translate-y-1/2 text-ink-3"
+        />
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -171,44 +199,62 @@ export function OutlinePanel() {
           placeholder="Filter symbols"
           aria-label="Filter symbols"
           spellCheck={false}
-          className="h-7 w-full rounded-control bg-field px-2.5 text-[12.5px] text-ink shadow-[inset_0_0_0_1px_var(--line)] outline-none placeholder:text-ink-3 focus:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_var(--accent-tint)]"
+          className="h-7 w-full rounded-[7px] bg-field pr-2.5 pl-7 text-[12.5px] text-ink outline-none transition-[background-color,box-shadow] duration-100 ease-out placeholder:text-ink-3 [@media(hover:hover)]:hover:bg-hover focus:bg-field focus:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_3px_var(--accent-tint)]"
         />
       </div>
       <RightClick resolve={symbolMenu} className="flex min-h-0 flex-1 flex-col">
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5">
+        <div className="shrink-0 px-1.5 empty:hidden">
           {!outline ? <p className="px-2 py-2 text-[12px] text-ink-3">Reading symbols…</p> : null}
           {outline && !outline.new && !outline.old ? (
             <p className="px-2 py-2 text-[12px] leading-relaxed text-ink-3">No outline for this file type yet.</p>
           ) : null}
-          {rows.map((e) => (
-            <SymbolRow
-              key={`${e.line}:${e.name}`}
-              entry={e}
-              active={here === e || (here?.line === e.line && here.name === e.name)}
-              side="additions"
-              changedView={onlyChanged}
-            />
-          ))}
           {view && filter.trim() && !rows.length ? (
             <p className="px-2 py-2 text-[12px] text-ink-3">No symbol matches “{filter.trim()}”.</p>
           ) : null}
           {view && onlyChanged && !filter.trim() && !rows.length ? (
             <p className="px-2 py-2 text-[12px] text-ink-3">No symbols changed in this file.</p>
           ) : null}
-          {view?.removed.length ? (
-            <>
-              <div className="px-2 pt-3 pb-1 text-[11.5px] font-medium text-ink-3">Removed</div>
-              {view.removed.map((s) => (
-                <SymbolRow
-                  key={`old:${s.line}:${s.name}`}
-                  entry={{ ...s, depth: 0, status: null }}
-                  removed
-                  side="deletions"
-                />
-              ))}
-            </>
-          ) : null}
         </div>
+        {items.length ? (
+          <Virtuoso
+            // A list per file, mounted with its rows: it opens on the symbol the cursor is in.
+            key={path}
+            initialTopMostItemIndex={hereIndex >= 0 ? { index: hereIndex, align: "center" } : 0}
+            ref={list}
+            className="min-h-0 flex-1"
+            scrollerRef={(el) => {
+              scroller.current = el instanceof HTMLElement ? el : null;
+            }}
+            data={items}
+            computeItemKey={(_, item) =>
+              "heading" in item ? `h:${item.heading}` : `${item.side}:${item.entry.line}:${item.entry.name}`
+            }
+            increaseViewportBy={280}
+            rangeChanged={(r) => {
+              visible.current = r;
+            }}
+            itemsRendered={paint}
+            components={{ Header: ListPad, Footer: ListPad }}
+            itemContent={(_, item) =>
+              "heading" in item ? (
+                <div className="px-3.5 pt-3 pb-1 text-[11.5px] font-medium text-ink-3">{item.heading}</div>
+              ) : (
+                <div className="px-1.5">
+                  <SymbolRow
+                    entry={item.entry}
+                    active={
+                      !item.removed &&
+                      (here === item.entry || (here?.line === item.entry.line && here.name === item.entry.name))
+                    }
+                    removed={item.removed}
+                    side={item.side}
+                    changedView={!item.removed && onlyChanged}
+                  />
+                </div>
+              )
+            }
+          />
+        ) : null}
       </RightClick>
     </aside>
   );

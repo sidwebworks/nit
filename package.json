@@ -42,6 +42,7 @@
     "@pierre/theming": "1.0.2",
     "@pierre/trees": "1.0.0",
     "@silk-hq/components": "^0.10.2",
+    "@tanstack/react-query": "^5.107.1",
     "@vscode/tree-sitter-wasm": "^0.3.1",
     "fzf": "0.5.2",
     "iconoir-react": "^7.12.2",

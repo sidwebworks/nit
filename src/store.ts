@@ -95,6 +95,8 @@ export function openStore(review: string) {
   // User settings (the theme): shared by every review, unlike the rest of this file.
   db.run("create table if not exists setting (key text primary key, value text not null)");
   const getSetting = db.query<{ value: string }, [string]>("select value from setting where key = ?");
+  // Goes up whenever another connection (another nit) commits to this database.
+  const dataVersion = db.query<{ data_version: number }, []>("PRAGMA data_version");
   const putSetting = db.query(
     "insert into setting (key, value) values (?, ?) on conflict (key) do update set value = excluded.value",
   );
@@ -168,6 +170,8 @@ export function openStore(review: string) {
     setAgentRun: (run: AgentRun) => {
       putRun.run(review, JSON.stringify(run));
     },
+    /** Changes when another process writes to the database: how one nit hears another's changes. */
+    dataVersion: () => dataVersion.get()?.data_version ?? 0,
     setting: (key: string): unknown => {
       const row = getSetting.get(key);
       return row ? JSON.parse(row.value) : null;

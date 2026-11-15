@@ -95,6 +95,8 @@ function HideMenu({ hidden }: { hidden: number }) {
   );
 }
 
+const count = (n: number) => n.toLocaleString();
+
 export function FileList() {
   const agentRunning = st.useStore((s) => s.agent?.state === "running" || s.job?.state === "running");
   const jobKind = st.useStore((s) => (s.job?.state === "running" ? s.job.kind : null));
@@ -150,33 +152,34 @@ export function FileList() {
         <PullRequestButton />
       </header>
 
-      <div className="flex h-7 shrink-0 items-center gap-2 px-3.5 text-[12px] text-ink-3">
-        <span className="font-medium text-ink-2">Files</span>
-        <span className="tabular-nums">{files.length}</span>
+      {/* Where the review stands: viewed of total leads, the size of the change follows. */}
+      <div className="flex h-7 shrink-0 items-center gap-2.5 pr-2 pl-3.5 text-[12px] text-ink-3">
         <span
-          className="whitespace-nowrap tabular-nums"
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap tabular-nums"
+          title={`${count(done)} of ${count(files.length)} files viewed`}
+        >
+          <ProgressRing value={files.length ? done / files.length : 0} />
+          <span>
+            <span className={done ? "text-ink" : "text-ink-2"}>{count(done)}</span> of {count(files.length)}
+          </span>
+        </span>
+        <span
+          className="min-w-0 truncate font-mono text-[11px] tabular-nums"
           title="Lines changed, not counting generated files, tests and docs"
         >
-          <span className="text-green">+{code.add}</span> <span className="text-red">−{code.del}</span>
+          <span className="text-green">+{count(code.add)}</span> <span className="text-red">−{count(code.del)}</span>
         </span>
         {changed ? (
           <span
-            className="whitespace-nowrap text-orange tabular-nums"
+            className="shrink-0 rounded-chip bg-orange-tint px-1.5 text-[11px] leading-[18px] text-orange tabular-nums"
             title={`${changed} files you marked viewed changed since`}
           >
-            · {changed} changed
+            {changed} changed
           </span>
         ) : null}
-        <span className="ml-auto flex items-center">
+        <span className="ml-auto flex shrink-0 items-center gap-0.5">
           <HideMenu hidden={hidden} />
           <GuideButton />
-        </span>
-        <span
-          className="flex items-center gap-1.5 whitespace-nowrap tabular-nums"
-          title={`${done} of ${files.length} files viewed`}
-        >
-          <ProgressRing value={files.length ? done / files.length : 0} />
-          {done}/{files.length}
         </span>
       </div>
 

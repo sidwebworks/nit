@@ -1,28 +1,22 @@
-import type { TokenEventBase } from "@pierre/diffs";
-import { File } from "@pierre/diffs/react";
+import type { CodeViewFileItem, DiffTokenEventBaseProps, TokenEventBase } from "@pierre/diffs";
+import { CodeView, type CodeViewHandle, useStableCallback } from "@pierre/diffs/react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, SidebarExpand, Xmark } from "iconoir-react/regular";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "./api";
+import { useEffect, useMemo, useRef } from "react";
 import { HIGHLIGHTER } from "./Code";
-import { DIFF_CSS, linkKey, revealLine, tokenLink } from "./DiffPane";
+import { CODE_SCROLL, DIFF_CSS, linkKey, revealIn, tokenLink } from "./DiffPane";
 import { FilePath } from "./FilePath";
 import * as nav from "./nav";
 import { OutlineToggle } from "./Outline";
 import { PeekAnnotation } from "./Peek";
+import { fileQuery, useOutline } from "./query";
 import * as st from "./state";
 import { useTheme } from "./theme";
 import { IconButton, Kbd } from "./ui";
 
-const texts = new Map<string, Promise<string | null>>();
-export const textOf = (path: string) => {
-  let p = texts.get(path);
-  if (!p) {
-    p = api.file(path).then((c) => c.new);
-    p.catch(() => texts.delete(path));
-    texts.set(path, p);
-  }
-  return p;
-};
+type Peek = { peek: true };
+// CodeView only updates a controlled item when its version changes.
+let nextFileVersion = 0;
 
 /**
  * A file outside the review, opened from a definition or reference: read-only, with the same
@@ -33,37 +27,48 @@ export function FilePane() {
   const peekAt = st.useStore((s) => s.peek?.at);
   const sidebar = st.useStore((s) => s.sidebar);
   const outlineOpen = st.useStore((s) => s.outlineOpen);
-  const outline = st.useStore((s) => (browse ? s.outlines[browse.path] : undefined));
+  const outline = useOutline(browse?.path, undefined, false);
   const { darkThemeName, lightThemeName, resolvedColorScheme } = useTheme();
-  const [text, setText] = useState<{ path: string; contents: string | null; error?: string } | null>(null);
   const path = browse?.path;
   const line = browse?.line;
+  const rev = st.useStore((s) => s.rev);
+  // Outside the review, so not in the diff the version comes from: read it again each time it
+  // opens (what was cached shows meanwhile), or an edit made since would never show.
+  const text = useQuery({ ...fileQuery(rev, path ?? ""), enabled: !!path, staleTime: 0 });
+  const contents = text.data?.new ?? null;
 
+  // The file's length, for the line count shown with it.
   useEffect(() => {
-    if (!path) return;
-    let alive = true;
-    nav.loadOutline(path, undefined, false);
-    textOf(path).then(
-      (contents) => {
-        if (!alive) return;
-        setText({ path, contents });
-        if (contents !== null) {
-          const lines = contents.split("\n").length;
-          st.set((s) => (s.browse?.path === path ? { browse: { ...s.browse, lines } } : {}));
-        }
-      },
-      (e: unknown) => alive && setText({ path, contents: null, error: String(e) }),
-    );
-    return () => {
-      alive = false;
-    };
-  }, [path]);
+    if (!path || contents === null) return;
+    const lines = contents.split("\n").length;
+    st.set((s) => (s.browse?.path === path ? { browse: { ...s.browse, lines } } : {}));
+  }, [path, contents]);
 
-  const contents = text && text.path === path ? text.contents : null;
   const ready = contents !== null;
+  // CodeView draws only the rows near the viewport: a 30,000-line file opens as fast as a small one.
+  const view = useRef<CodeViewHandle<Peek, undefined>>(null);
+  const peekLine = peekAt?.line;
+  const items = useMemo<CodeViewFileItem<Peek>[]>(
+    () =>
+      path && contents !== null
+        ? [
+            {
+              id: path,
+              type: "file",
+              version: ++nextFileVersion,
+              // The highlight cache is keyed by this: a changed file must not reuse the old colouring.
+              file: { name: path, contents, cacheKey: `${path}:${st.hashOf(contents)}` },
+              annotations: peekLine ? [{ lineNumber: peekLine, metadata: { peek: true } }] : [],
+            },
+          ]
+        : [],
+    [path, contents, peekLine],
+  );
   useEffect(() => {
-    if (ready && line) revealLine("additions", line);
-  }, [ready, line]);
+    if (ready && line && path) revealIn(view.current, path, line);
+  }, [ready, line, path]);
+  const selected = useMemo(() => (path && line ? { id: path, range: { start: line, end: line } } : null), [path, line]);
+  const renderPeek = useStableCallback(() => <PeekAnnotation />);
 
   const wrap = st.useStore((s) => s.prefs.wrap);
   const options = useMemo(
@@ -75,13 +80,13 @@ export function FilePane() {
       preferredHighlighter: HIGHLIGHTER,
       lineHoverHighlight: "number" as const,
       unsafeCSS: DIFF_CSS,
-      onTokenEnter: (t: TokenEventBase, e: PointerEvent) => {
+      onTokenEnter: (t: TokenEventBase | DiffTokenEventBaseProps, e: PointerEvent) => {
         const b = st.get().browse;
         if (b)
           tokenLink.enter(t.tokenElement, e, { path: b.path, side: "additions", line: t.lineNumber }, t.lineCharStart);
       },
-      onTokenLeave: (t: TokenEventBase) => tokenLink.leave(t.tokenElement),
-      onTokenClick: async (t: TokenEventBase, e: MouseEvent) => {
+      onTokenLeave: (t: TokenEventBase | DiffTokenEventBaseProps) => tokenLink.leave(t.tokenElement),
+      onTokenClick: async (t: TokenEventBase | DiffTokenEventBaseProps, e: MouseEvent) => {
         const b = st.get().browse;
         if (!b) return;
         st.set({ browse: { ...b, line: t.lineNumber } });
@@ -100,7 +105,6 @@ export function FilePane() {
   const dep = browse.path.lastIndexOf("node_modules/");
   const shown = dep === -1 ? browse.path : browse.path.slice(dep + "node_modules/".length);
   const scope = nav.enclosing(outline?.new, browse.line).slice(-2);
-  const file = contents !== null ? { name: browse.path, contents, cacheKey: browse.path } : null;
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-page">
@@ -125,23 +129,21 @@ export function FilePane() {
         </div>
         {outlineOpen ? null : <OutlineToggle />}
       </header>
-      <div data-diff-scroll className="min-h-0 flex-1 overflow-auto">
-        {file ? (
-          <File<{ peek: true }>
+      <div className="min-h-0 flex-1">
+        {items.length ? (
+          <CodeView<Peek, undefined>
             key={browse.path}
-            file={file}
+            ref={view}
+            className={CODE_SCROLL}
+            containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
+            items={items}
             options={options}
-            selectedLines={{ start: browse.line, end: browse.line }}
-            lineAnnotations={peekAt ? [{ lineNumber: peekAt.line, metadata: { peek: true } }] : []}
-            renderAnnotation={() => <PeekAnnotation />}
+            selectedLines={selected}
+            renderAnnotation={renderPeek}
           />
         ) : (
           <p className="px-4 py-3 text-[12.5px] text-ink-3">
-            {text?.path === path && text?.error
-              ? text.error
-              : text?.path === path
-                ? "This file isn't in the working tree."
-                : "Reading…"}
+            {text.error ? text.error.message : text.isPending ? "Reading…" : "This file isn't in the working tree."}
           </p>
         )}
       </div>

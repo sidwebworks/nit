@@ -8,6 +8,7 @@ import {
 import { colorUtils, normalizeThemeColors } from "@pierre/theming/color";
 import { useThemeController } from "@pierre/theming/react";
 import { themes } from "@pierre/theming/themes";
+import { flushSync } from "react-dom";
 import { api } from "./api";
 
 /**
@@ -32,7 +33,9 @@ export const catalog = createThemeCatalog({
 
 const vars: Partial<Record<ColorScheme, Vars>> = { ...saved?.vars };
 
+let fromElsewhere = false;
 function persist(s: ThemeSelection) {
+  if (fromElsewhere) return; // it's already saved: that's how it got here
   const { mode, lightThemeName, darkThemeName } = s;
   api.saveTheme({ mode, lightThemeName, darkThemeName, vars }).catch(() => {});
 }
@@ -49,6 +52,45 @@ export const theme = createThemeController({
 });
 
 export const useTheme = () => useThemeController(theme);
+
+/** A theme chosen in another tab or another repo's nit: switch to it, without saving it again. */
+export function applySharedTheme(value: unknown) {
+  const next = value as Partial<ThemeSelection> | null;
+  if (!next?.mode || !next.lightThemeName || !next.darkThemeName) return;
+  const now = theme.getState();
+  if (now.mode === next.mode && now.lightThemeName === next.lightThemeName && now.darkThemeName === next.darkThemeName)
+    return;
+  const { mode, lightThemeName, darkThemeName } = next as ThemeSelection;
+  const load = nameFor({ mode, lightThemeName, darkThemeName }, now.resolvedColorScheme);
+  void switchTheme(() => {
+    fromElsewhere = true;
+    try {
+      if (now.mode !== mode) theme.setColorMode(mode);
+      if (now.lightThemeName !== lightThemeName) theme.setThemeNameForScheme("light", lightThemeName);
+      if (now.darkThemeName !== darkThemeName) theme.setThemeNameForScheme("dark", darkThemeName);
+    } finally {
+      fromElsewhere = false;
+    }
+  }, load);
+}
+
+/**
+ * Changes the theme in one step: a newly picked theme loads first, then the whole page switches
+ * at once, crossfaded where the browser has view transitions. Colour transitions are off for
+ * that frame, so no control fades on its own schedule while the rest snaps.
+ */
+export async function switchTheme(change: () => void, load?: string) {
+  if (load) await theme.resolver.resolveTheme(load).catch(() => {});
+  const root = document.documentElement;
+  const update = () => {
+    root.dataset.themeSwitch = "";
+    flushSync(change); // React's part of the page changes inside this frame too
+    void root.offsetWidth; // the new colours apply while transitions are still off
+    requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitch));
+  };
+  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return update();
+  await document.startViewTransition(update).finished.catch(() => {});
+}
 export const nameFor = (s: ThemeSelection, scheme: ColorScheme) =>
   scheme === "dark" ? s.darkThemeName : s.lightThemeName;
 

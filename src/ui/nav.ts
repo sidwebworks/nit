@@ -128,34 +128,6 @@ window.addEventListener("popstate", () => void applyUrl());
 
 // ---------- outlines
 
-const pending = new Map<string, { patch: string | undefined; oldLoaded: boolean; promise: Promise<void> }>();
-
-/** Fetches a file's symbols once per file version (the store clears them on reload). */
-export function loadOutline(path: string, prevName?: string, includeOld = true) {
-  const patch = st.get().data?.patch;
-  const cached = st.get().outlines[path];
-  if (cached && (cached.oldLoaded || !includeOld)) return;
-  const inFlight = pending.get(path);
-  if (inFlight && inFlight.patch === patch && (inFlight.oldLoaded || !includeOld)) return;
-  const p = api
-    .symbols(path, prevName, includeOld)
-    .then((o) => {
-      if (st.get().data?.patch !== patch) return;
-      st.set((s) => {
-        if (s.outlines[path]?.oldLoaded && !includeOld) return {};
-        return { outlines: { ...s.outlines, [path]: { ...o, oldLoaded: includeOld } } };
-      });
-    })
-    .catch(() => {
-      if (st.get().data?.patch !== patch || st.get().outlines[path]) return;
-      st.set((s) => ({ outlines: { ...s.outlines, [path]: { new: null, old: null, oldLoaded: includeOld } } }));
-    })
-    .finally(() => {
-      if (pending.get(path)?.promise === p) pending.delete(path);
-    });
-  pending.set(path, { patch, oldLoaded: includeOld, promise: p });
-}
-
 /** Symbols that contain a line, outermost first. */
 export function enclosing(symbols: Sym[] | null | undefined, line: number) {
   return (symbols ?? [])

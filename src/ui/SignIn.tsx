@@ -1,8 +1,9 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { useQuery } from "@tanstack/react-query";
 import { Copy, Sparks } from "iconoir-react/regular";
 import { useEffect } from "react";
-import { api } from "./api";
 import { copy } from "./Menu";
+import { claudeAuthQuery } from "./query";
 import * as st from "./state";
 import { Button, IconButton } from "./ui";
 
@@ -23,16 +24,13 @@ export function SignInDialog() {
  */
 function SignIn({ retry }: { retry: (() => void) | null }) {
   // Watch for the login to land; a terminal sign-in takes a minute, so every two seconds is plenty.
+  const loggedIn = useQuery({ ...claudeAuthQuery, refetchInterval: 2000 }).data?.loggedIn;
   useEffect(() => {
-    const t = setInterval(async () => {
-      const s = await api.auth().catch(() => null);
-      if (!s?.loggedIn) return;
-      st.set({ signIn: null });
-      st.notify("Signed in to Claude");
-      retry?.();
-    }, 2000);
-    return () => clearInterval(t);
-  }, [retry]);
+    if (!loggedIn) return;
+    st.set({ signIn: null });
+    st.notify("Signed in to Claude");
+    retry?.();
+  }, [loggedIn, retry]);
 
   const close = () => st.set({ signIn: null });
   const useKey = () => st.set({ signIn: null, settingsOpen: true, settingsSection: "reviewer" });

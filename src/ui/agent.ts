@@ -183,30 +183,58 @@ export function accept(id: string) {
   if (d?.proposal) st.replaceDraft({ ...d, proposal: null });
 }
 
-/** Follows the server's agent stream for the life of the page; reconnects on its own. */
+/**
+ * The page's live connection to its nit (one WebSocket): the agent's events, and settings saved in
+ * another tab or another repo's nit. It reconnects on its own, and picks up the run's state again
+ * each time, so nothing said while it was away is missed.
+ */
 export function connect() {
-  void api.agent().then(
-    ({ run }) => st.set({ agent: run }),
-    () => {},
-  );
-  const source = new EventSource("/api/agent/events");
-  void api.job().then(
-    ({ job }) => job && st.set({ job }),
-    () => {},
-  );
-  source.onmessage = (m) => {
-    const e = JSON.parse(m.data) as AgentEvent;
-    if (e.type === "run") return onRun(e.run);
-    if (e.type === "job") return onJob(e.job);
-    if (e.type === "delta")
-      return st.set((s) => (s.job?.state === "running" ? { job: { ...s.job, answer: s.job.answer + e.text } } : {}));
-    const item =
-      e.type === "tool"
-        ? { kind: "tool" as const, tool: e.tool, target: e.target }
-        : { kind: "text" as const, text: e.text };
-    st.set((s) => ({ agentActivity: [...s.agentActivity, item].slice(-MAX_ACTIVITY) }));
+  let socket: WebSocket | null = null;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let wait = 500;
+  let closed = false;
+  const catchUp = () => {
+    void api.agent().then(
+      ({ run }) => st.set({ agent: run }),
+      () => {},
+    );
+    void api.job().then(
+      ({ job }) => job && st.set({ job }),
+      () => {},
+    );
   };
-  return () => source.close();
+  const open = () => {
+    socket = new WebSocket(`ws://${location.host}/api/live`);
+    socket.onopen = () => {
+      wait = 500;
+      catchUp();
+    };
+    socket.onmessage = (m) => onEvent(JSON.parse(m.data as string) as AgentEvent);
+    socket.onclose = () => {
+      if (closed) return;
+      retry = setTimeout(open, wait); // nit restarting, or the laptop waking: try again, backing off
+      wait = Math.min(wait * 2, 5000);
+    };
+  };
+  open();
+  return () => {
+    closed = true;
+    clearTimeout(retry);
+    socket?.close();
+  };
+}
+
+function onEvent(e: AgentEvent) {
+  if (e.type === "settings") return st.applySharedSettings(e.prefs, e.theme);
+  if (e.type === "run") return onRun(e.run);
+  if (e.type === "job") return onJob(e.job);
+  if (e.type === "delta")
+    return st.set((s) => (s.job?.state === "running" ? { job: { ...s.job, answer: s.job.answer + e.text } } : {}));
+  const item =
+    e.type === "tool"
+      ? { kind: "tool" as const, tool: e.tool, target: e.target }
+      : { kind: "text" as const, text: e.text };
+  st.set((s) => ({ agentActivity: [...s.agentActivity, item].slice(-MAX_ACTIVITY) }));
 }
 
 /** Hands the drafts (all, or some) to Claude. */

@@ -8,7 +8,7 @@ import {
   type SelectedLineRange,
   type TokenEventBase,
 } from "@pierre/diffs";
-import { CodeView, type CodeViewHandle } from "@pierre/diffs/react";
+import { CodeView, type CodeViewHandle, useStableCallback } from "@pierre/diffs/react";
 import {
   AlignJustify,
   ArrowRight,
@@ -40,6 +40,7 @@ import * as nav from "./nav";
 import { OutlineToggle } from "./Outline";
 import { PeekAnnotation } from "./Peek";
 import { CheckAnnotationRow } from "./PullRequest";
+import { identifiersQuery, queryClient, useOutline } from "./query";
 import * as st from "./state";
 import * as suggest from "./suggest";
 import { ThreadAnnotation } from "./Threads";
@@ -101,6 +102,30 @@ function findRow(side: "additions" | "deletions", line: number) {
  * view sideways). Off screen (a jump) centres it; near an edge (j/k) nudges it. A freshly
  * remounted diff draws a frame or two late, so it retries briefly.
  */
+/**
+ * The scroll region CodeView owns: it anchors and virtualizes the rows itself, so the browser's
+ * own scroll anchoring stays off, and containment keeps its layout from reaching the page.
+ */
+export const CODE_SCROLL = "h-full overflow-auto overscroll-contain [contain:strict] [overflow-anchor:none]";
+
+/**
+ * Brings a line into view in a CodeView: a drawn row gets the usual centre-or-nudge; CodeView
+ * only draws rows near the viewport, so a far line is centred by CodeView itself.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: either pane's CodeView, whatever its annotations
+export function revealIn(view: CodeViewHandle<any, undefined> | null, id: string, line: number, side?: Side) {
+  if (findRow(side ?? "additions", line)) revealLine(side ?? "additions", line, 0);
+  else
+    view?.scrollTo({
+      type: "line",
+      id,
+      lineNumber: line,
+      ...(side ? { side } : {}),
+      align: "center",
+      behavior: "instant",
+    });
+}
+
 export function revealLine(side: "additions" | "deletions", line: number, tries = 10) {
   const el = findRow(side, line);
   const scroller = document.querySelector<HTMLElement>("[data-diff-scroll]");
@@ -120,6 +145,7 @@ export function revealLine(side: "additions" | "deletions", line: number, tries 
 // Inside Pierre's shadow root: the cursor row, quiet separators, the comment gutter button, and
 // search marks (ui/marks.ts).
 export const DIFF_CSS = `
+* { font-style: normal !important; } /* themes italicise comments and keywords; nit doesn't */
 [data-line][data-selected-line] { box-shadow: inset 2px 0 0 var(--accent), inset 0 0 0 999px var(--accent-tint); }
 [data-separator-content] { font-family: var(--diffs-header-font-family); font-size: 12px; letter-spacing: -0.005em; color: var(--ink-3); }
 [data-expand-button] { color: var(--ink-3); transition: color 100ms, background-color 100ms; }
@@ -137,18 +163,8 @@ export const linkKey = (e: MouseEvent | KeyboardEvent) => e.metaKey || e.ctrlKey
 // like an editor: keywords, strings, comments and punctuation aren't links.
 let hovered: { el: Element; at: At; col: number } | null = null;
 let held = false;
-const lines = new Map<string, Promise<{ name: string; col: number }[]>>();
-let linesOf: unknown = null;
 function identifiers(at: At) {
-  // A reload means the files may have changed; start over.
-  if (st.get().data !== linesOf) {
-    lines.clear();
-    linesOf = st.get().data;
-  }
-  const key = `${at.side}\0${at.path}\0${at.line}`;
-  const p = lines.get(key) ?? api.identifiers(at).catch(() => []);
-  lines.set(key, p);
-  return p;
+  return queryClient.ensureQueryData(identifiersQuery(st.get().rev, at));
 }
 const symbolAt = async (at: At, col: number) =>
   (await identifiers(at)).some((i) => col >= i.col && col < i.col + i.name.length);
@@ -346,7 +362,7 @@ function useSinceViewed(file: FileDiffMetadata | null, on: boolean) {
       }
       setDiff(
         parseDiffFromFile(
-          { name: file.name, contents: then.text, cacheKey: `viewed:${file.name}:${then.text.length}` },
+          { name: file.name, contents: then.text, cacheKey: `viewed:${file.name}:${st.hashOf(then.text)}` },
           { name: file.name, contents: now.new },
         ),
       );
@@ -429,13 +445,9 @@ export function DiffPane() {
   }, []);
   const threads = st.useStore((s) => (s.github?.status === "ready" ? s.github.threads : null));
   const checkNotes = st.useStore((s) => (s.github?.status === "ready" ? s.github.annotations : null));
-  const outline = st.useStore((s) => (file ? s.outlines[file.name] : undefined));
+  const outline = useOutline(file?.name, file?.prevName);
   const sidebar = st.useStore((s) => s.sidebar);
   const outlineOpen = st.useStore((s) => s.outlineOpen);
-
-  useEffect(() => {
-    if (file) nav.loadOutline(file.name, file.prevName);
-  }, [file]);
 
   const annotations = useMemo<DiffLineAnnotation<Meta>[]>(() => {
     if (!file) return [];
@@ -480,19 +492,7 @@ export function DiffPane() {
   }, [cursor, anchor, suggestingHere]);
 
   useEffect(() => {
-    if (!cursor || !file) return;
-    // A drawn row gets the usual centre-or-nudge; CodeView only draws rows near the viewport,
-    // so a far jump asks it to centre the line instead.
-    if (findRow(cursor.side, cursor.line)) revealLine(cursor.side, cursor.line, 0);
-    else
-      codeView.current?.scrollTo({
-        type: "line",
-        id: file.name,
-        lineNumber: cursor.line,
-        side: cursor.side,
-        align: "center",
-        behavior: "instant",
-      });
+    if (cursor && file) revealIn(codeView.current, file.name, cursor.line, cursor.side);
   }, [cursor, file]);
 
   const renderAnnotation = useCallback(
@@ -513,6 +513,15 @@ export function DiffPane() {
         <DraftAnnotation id={a.metadata.id} />
       ),
     [],
+  );
+
+  // Stable for CodeView, as Pierre asks of every callback it's handed.
+  const renderItemAnnotation = useStableCallback(
+    (annotation: DiffLineAnnotation<Meta> | { lineNumber: number }, _source: unknown, item: { type: string }) =>
+      item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null,
+  );
+  const onItemEditComplete = useStableCallback((event: unknown) =>
+    onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>),
   );
 
   const items = useMemo<CodeViewDiffItem<Meta>[]>(
@@ -615,15 +624,13 @@ export function DiffPane() {
           <RightClick resolve={lineMenu} className="h-full">
             <CodeView<Meta, undefined>
               ref={codeView}
-              className="h-full overflow-auto"
+              className={CODE_SCROLL}
               containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
               items={items}
               options={options}
-              renderAnnotation={(annotation, _source, item) =>
-                item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null
-              }
+              renderAnnotation={renderItemAnnotation}
               selectedLines={selected ? { id: file.name, range: selected } : null}
-              onItemEditComplete={(event) => onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>)}
+              onItemEditComplete={onItemEditComplete}
             />
           </RightClick>
         )}

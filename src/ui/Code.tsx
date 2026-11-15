@@ -1,4 +1,4 @@
-import { getFiletypeFromFileName, getSharedHighlighter, type SupportedLanguages } from "@pierre/diffs";
+import { canUseWASM, getFiletypeFromFileName, getSharedHighlighter, type SupportedLanguages } from "@pierre/diffs";
 import { useEffect, useId, useState } from "react";
 import { useTheme } from "./theme";
 
@@ -7,9 +7,10 @@ type Themes = { dark: string; light: string };
 /**
  * Pierre's Highlights engine (WebAssembly lexers, synchronous) for every code view. Shiki JS
  * blocked the main thread 70–270ms per file switch; Highlights brought that to zero. One
- * engine per page: Pierre refuses to mix them.
+ * engine per page: Pierre refuses to mix them. Highlights needs WebAssembly with SIMD; where a
+ * browser lacks it (or blocks it), Shiki JS takes over.
  */
-export const HIGHLIGHTER = "highlights" as const;
+export const HIGHLIGHTER = canUseWASM() ? ("highlights" as const) : ("shiki-js" as const);
 const cache = new Map<string, Promise<string | null>>();
 
 export const langFor = (path: string) => getFiletypeFromFileName(path) ?? "";

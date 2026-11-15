@@ -344,4 +344,6 @@ export type AgentEvent =
   | { type: "job"; job: Job }
   | { type: "delta"; text: string }
   | { type: "text"; text: string }
-  | { type: "tool"; tool: string; target: string };
+  | { type: "tool"; tool: string; target: string }
+  /** Settings saved elsewhere (another tab, another repo's nit): they're shared, so take them. */
+  | { type: "settings"; prefs: Prefs; theme: unknown };
