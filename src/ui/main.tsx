@@ -2,7 +2,7 @@ import { Toast } from "@base-ui/react/toast";
 import { EditProvider } from "@pierre/diffs/react";
 import { IconoirProvider } from "iconoir-react";
 import { Check, GitCompare, WarningCircle } from "iconoir-react/regular";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentPanel } from "./AgentPanel";
 import { handleKey, handleSuggestKey } from "./actions";
@@ -11,6 +11,7 @@ import { ChangesPane } from "./ChangesPane";
 import { DiffPane } from "./DiffPane";
 import { FileList } from "./FileList";
 import { FilePane } from "./FilePane";
+import logo from "./icon.svg";
 import { useFindMarks } from "./marks";
 import * as nav from "./nav";
 import { OutlinePanel } from "./Outline";
@@ -64,6 +65,19 @@ function Toasts() {
   );
 }
 
+/**
+ * The logo while the review loads, the same as index.html shows before the script runs. Its
+ * animations are timed from page load, so taking over from the static one doesn't restart them.
+ */
+function Loading() {
+  const [since] = useState(() => performance.now());
+  return (
+    <div className="loading">
+      <img src={logo} alt="Loading" style={{ animationDelay: `${300 - since}ms, ${540 - since}ms` }} />
+    </div>
+  );
+}
+
 function App() {
   const hasData = st.useStore((s) => s.data !== null);
   const base = st.useStore((s) => s.data?.base);
@@ -110,8 +124,7 @@ function App() {
         body="Check that nit is still running in your terminal, then reload this tab."
       />
     );
-  // Loading locally takes a few milliseconds; showing nothing avoids a spinner flash.
-  if (!hasData) return null;
+  if (!hasData) return <Loading />;
   if (!count)
     return (
       <EmptyState
