@@ -1,9 +1,10 @@
 import { ArrowRight, Copy, List, SidebarCollapse, SidebarExpand } from "iconoir-react/regular";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Side, Symbol as Sym } from "../types";
-import { changedLines, firstInRange } from "./lines";
+import type { Side } from "../types";
+import { changedLines } from "./lines";
 import { copy, type MenuItem, RightClick } from "./Menu";
 import * as nav from "./nav";
+import { buildOutline, type Entry, jumpTarget } from "./outline-model";
 import * as st from "./state";
 import { fuzzy, IconButton, paintMatches, Resizer, TextSegmented } from "./ui";
 
@@ -24,37 +25,6 @@ const KIND: Record<string, { letter: string; tone: string }> = {
   test: { letter: "t", tone: "text-green" },
 };
 const kindOf = (k: string) => KIND[k] ?? { letter: k.slice(0, 1), tone: "text-ink-3" };
-
-type Entry = Sym & { depth: number; status: "added" | "changed" | null; changedLine?: number };
-
-const key = (s: Sym) => `${s.kind}:${s.name}`;
-
-/** Old symbols whose span holds a removed line: they changed even if no line was added. */
-function touchedOld(old: Sym[], removed: number[]) {
-  const keys = new Set<string>();
-  for (const s of old) if (firstInRange(removed, s.line, s.endLine) !== undefined) keys.add(key(s));
-  return keys;
-}
-
-/**
- * Nesting by containment, plus what the diff did to each symbol: `added` if it didn't exist
- * before, `changed` if an added line falls in it or a removed line fell in its old version.
- */
-function entries(symbols: Sym[], old: Sym[] | null, added: Set<number>, removed: Set<number>): Entry[] {
-  const before = old ? new Set(old.map(key)) : null;
-  const addedLines = [...added].sort((a, b) => a - b);
-  const touched = old ? touchedOld(old, [...removed].sort((a, b) => a - b)) : new Set<string>();
-  const stack: Sym[] = [];
-  return symbols.map((s) => {
-    while (stack.length && stack[stack.length - 1].endLine < s.line) stack.pop();
-    const depth = stack.length;
-    stack.push(s);
-    const changedLine = firstInRange(addedLines, s.line, s.endLine);
-    const status =
-      before && !before.has(key(s)) ? "added" : changedLine !== undefined || touched.has(key(s)) ? "changed" : null;
-    return { ...s, depth, status, changedLine };
-  });
-}
 
 /**
  * Hides or shows the outline (O). It sits in the outline's header while open and at the right
@@ -121,12 +91,9 @@ export function OutlinePanel() {
 
   const view = useMemo(() => {
     if (!outline) return null;
-    if (!file) return { all: entries(outline.new ?? [], null, new Set(), new Set()), removed: [], changedCount: 0 };
+    if (!file) return buildOutline(outline.new ?? [], null, new Set(), new Set());
     const { added, removed: gone } = changedLines(file);
-    const all = entries(outline.new ?? [], file.type === "new" ? [] : outline.old, added, gone);
-    const present = new Set((outline.new ?? []).map(key));
-    const removed = (outline.old ?? []).filter((s) => !present.has(key(s)));
-    return { all, removed, changedCount: all.filter((e) => e.status).length };
+    return buildOutline(outline.new ?? [], file.type === "new" ? [] : outline.old, added, gone);
   }, [file, outline]);
 
   const here = cursor?.side === "additions" ? nav.enclosing(outline?.new, cursor.line).at(-1) : undefined;
@@ -192,9 +159,10 @@ export function OutlinePanel() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && rows[0])
-              void nav.revealSymbol(rows[0], "additions", onlyChanged ? rows[0].changedLine : undefined);
-            else if (e.key === "Escape" && filter) setFilter("");
+            if (e.key === "Enter" && rows[0]) {
+              const target = jumpTarget(rows[0], "additions", onlyChanged);
+              void nav.revealSymbol(rows[0], target.side, target.line);
+            } else if (e.key === "Escape" && filter) setFilter("");
             else if (e.key === "Escape") e.currentTarget.blur();
             else return;
             e.preventDefault();
@@ -263,7 +231,10 @@ function SymbolRow({
   return (
     <button
       type="button"
-      onClick={() => void nav.revealSymbol(entry, side, changedView ? entry.changedLine : undefined)}
+      onClick={() => {
+        const target = jumpTarget(entry, side, changedView);
+        void nav.revealSymbol(entry, target.side, target.line);
+      }}
       data-symbol={entry.name}
       title={`${entry.kind} ${entry.name}, lines ${entry.line}–${entry.endLine}`}
       className={`flex h-7 w-full min-w-0 items-center gap-2 rounded-control pr-2 text-left transition-[background-color] duration-100 [@media(hover:hover)]:hover:bg-hover ${

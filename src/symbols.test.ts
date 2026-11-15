@@ -105,3 +105,10 @@ test("outline: test blocks by name, declarations, no object properties or locals
 test("every outline query compiles", async () => {
   for (const g of ["typescript", "tsx", "javascript"] as const) expect((await load(g)).outline).not.toBeNull();
 });
+
+test("deferred definitions remain available after their parse tree is evicted", async () => {
+  const source = "export function retained() { return 1; }";
+  const first = (await parse("evicted:first", "retained.ts", source))!;
+  for (let i = 0; i < 201; i++) await parse(`evicted:${i}`, "retained.ts", source);
+  expect(first.symbols.map((symbol) => symbol.name)).toContain("retained");
+});

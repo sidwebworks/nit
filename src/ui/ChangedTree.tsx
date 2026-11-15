@@ -80,6 +80,9 @@ const SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" ari
 
 // Counts never give way to a long name: the name truncates instead.
 const TREE_CSS = `
+[data-item-section="content"] { flex: 1 1 0; min-width: 0; }
+[data-item-flattened-subitems] { display: flex; min-width: 0; max-width: 100%; }
+[data-item-flattened-subitem] { min-width: 0; }
 [data-item-section="decoration"] { flex: 0 0 auto; overflow: visible; }
 [data-item-section="decoration"] > span {
   max-width: none; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums;
