@@ -39,7 +39,9 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 say "Downloading $asset"
-curl -fsSL "$url" -o "$tmp/$asset" || die "couldn't download $url"
+# A progress bar when someone's watching (curl draws it on stderr); quiet in CI and logs.
+if [ -t 2 ]; then progress=--progress-bar; else progress=-s; fi
+curl -fSL "$progress" "$url" -o "$tmp/$asset" || die "couldn't download $url"
 curl -fsSL "$url.sha256" -o "$tmp/$asset.sha256" || die "couldn't download the checksum"
 
 # The .sha256 file is "<hash>  <name>", made by shasum -a 256.
@@ -61,7 +63,7 @@ case ":$PATH:" in
   *":$dir:"*) ;;
   *) say "" && say "$dir isn't on your PATH. Add this to your shell's profile:" && say "  export PATH=\"$dir:\$PATH\"" ;;
 esac
-if ! command -v claude >/dev/null; then
-  say "" && say "Claude features need Claude Code: https://claude.com/claude-code"
+if ! command -v claude >/dev/null && ! command -v codex >/dev/null; then
+  say "" && say "AI features need Claude Code (https://claude.com/claude-code) or Codex."
 fi
 say "" && say "Run nit inside a git repository."
