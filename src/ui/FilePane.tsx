@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, SidebarExpand, Xmark } from "iconoir-react/regular";
 import { useEffect, useMemo, useRef } from "react";
 import { HIGHLIGHTER } from "./Code";
-import { CODE_SCROLL, DIFF_CSS, linkKey, revealIn, tokenLink } from "./DiffPane";
+import { CODE_SCROLL, DIFF_CSS, linkKey, revealIn, tokenLink, useCodeMetrics } from "./DiffPane";
 import { FilePath } from "./FilePath";
 import * as nav from "./nav";
 import { OutlineToggle } from "./Outline";
@@ -47,6 +47,7 @@ export function FilePane() {
   const ready = contents !== null;
   // CodeView draws only the rows near the viewport: a 30,000-line file opens as fast as a small one.
   const view = useRef<CodeViewHandle<Peek, undefined>>(null);
+  const metrics = useCodeMetrics();
   const peekLine = peekAt?.line;
   const items = useMemo<CodeViewFileItem<Peek>[]>(
     () =>
@@ -77,6 +78,7 @@ export function FilePane() {
       themeType: resolvedColorScheme,
       overflow: wrap ? ("wrap" as const) : ("scroll" as const),
       disableFileHeader: true,
+      itemMetrics: metrics,
       preferredHighlighter: HIGHLIGHTER,
       lineHoverHighlight: "number" as const,
       unsafeCSS: DIFF_CSS,
@@ -97,7 +99,7 @@ export function FilePane() {
         void nav.lookup("definition", { col: t.lineCharStart });
       },
     }),
-    [darkThemeName, lightThemeName, resolvedColorScheme, wrap],
+    [darkThemeName, lightThemeName, resolvedColorScheme, wrap, metrics],
   );
 
   if (!browse) return null;

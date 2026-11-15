@@ -106,6 +106,16 @@ function findRow(side: "additions" | "deletions", line: number) {
  * The scroll region CodeView owns: it anchors and virtualizes the rows itself, so the browser's
  * own scroll anchoring stays off, and containment keeps its layout from reaching the page.
  */
+/**
+ * Row height for Pierre's virtualizer. It assumes 20px unless told; with a bigger code size
+ * (Settings) rows are taller than that, so the end of a long file was out of reach and scrolling
+ * jumped as it corrected itself. Same rounding as --diffs-line-height in style.css.
+ */
+export function useCodeMetrics() {
+  const size = st.useStore((s) => s.prefs.fontSize);
+  return useMemo(() => ({ lineHeight: Math.ceil(size * 1.6) }), [size]);
+}
+
 export const CODE_SCROLL = "h-full overflow-auto overscroll-contain [contain:strict] [overflow-anchor:none]";
 
 /**
@@ -376,6 +386,7 @@ function useSinceViewed(file: FileDiffMetadata | null, on: boolean) {
 
 export function DiffPane() {
   const codeView = useRef<CodeViewHandle<Meta, undefined>>(null);
+  const metrics = useCodeMetrics();
   const file = st.useStore((s) => st.currentFile(s));
   const style = st.useStore((s) => s.style);
   // Pierre throws on expandUnchanged for a partial diff, so only once the file's full text is in.
@@ -396,6 +407,7 @@ export function DiffPane() {
       theme: { dark: darkTheme, light: lightTheme },
       themeType: scheme,
       diffStyle: style,
+      itemMetrics: metrics,
       preferredHighlighter: HIGHLIGHTER,
       expandUnchanged: full,
       diffIndicators: prefs.indicators,
@@ -430,7 +442,7 @@ export function DiffPane() {
         void nav.lookup("definition", { col: t.lineCharStart });
       },
     }),
-    [style, full, darkTheme, lightTheme, scheme, prefs.indicators, prefs.inlineChanges, prefs.wrap],
+    [style, full, darkTheme, lightTheme, scheme, prefs.indicators, prefs.inlineChanges, prefs.wrap, metrics],
   );
 
   const peekAt = st.useStore((s) => s.peek?.at);
