@@ -33,6 +33,7 @@ import { type At, api } from "./api";
 import { HIGHLIGHTER } from "./Code";
 import { DraftAnnotation } from "./Comments";
 import { FilePath } from "./FilePath";
+import { ImageDiff, isImage } from "./ImageDiff";
 import { stats } from "./lines";
 import { copy, type MenuItem, RightClick, selectedText } from "./Menu";
 import * as nav from "./nav";
@@ -534,6 +535,7 @@ export function DiffPane() {
 
   if (!file) return null;
   const { add, del } = stats(sinceDiff ?? file); // the counts follow the view
+  const image = isImage(file.name);
   // Which function or class the cursor is in, from the side it's on.
   const scope = cursor
     ? nav.enclosing(cursor.side === "additions" ? outline?.new : outline?.old, cursor.line).slice(-2)
@@ -548,10 +550,12 @@ export function DiffPane() {
           </IconButton>
         ) : null}
         <FilePath path={file.name} previous={file.prevName?.split("/").pop()} scope={scope} />
-        <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
-          <span className="text-green">+{add}</span>
-          <span className="text-red">−{del}</span>
-        </span>
+        {image ? null : (
+          <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
+            <span className="text-green">+{add}</span>
+            <span className="text-red">−{del}</span>
+          </span>
+        )}
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {changedSince ? (
@@ -565,14 +569,16 @@ export function DiffPane() {
               ]}
             />
           ) : null}
-          <IconButton
-            label={full ? "Fold unchanged lines" : "Show the whole file"}
-            keys="f"
-            onClick={() => void st.setFullFile(file.name, !full)}
-            className={full ? "bg-hover-2 text-ink" : ""}
-          >
-            <Expand />
-          </IconButton>
+          {image ? null : (
+            <IconButton
+              label={full ? "Fold unchanged lines" : "Show the whole file"}
+              keys="f"
+              onClick={() => void st.setFullFile(file.name, !full)}
+              className={full ? "bg-hover-2 text-ink" : ""}
+            >
+              <Expand />
+            </IconButton>
+          )}
           <IconButton label="Comment on file" keys="C" onClick={st.startFileComment}>
             <ChatPlusIn />
           </IconButton>
@@ -601,20 +607,26 @@ export function DiffPane() {
         {outlineOpen ? null : <OutlineToggle />}
       </header>
       <div className="min-h-0 flex-1">
-        <RightClick resolve={lineMenu} className="h-full">
-          <CodeView<Meta, undefined>
-            ref={codeView}
-            className="h-full overflow-auto"
-            containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
-            items={items}
-            options={options}
-            renderAnnotation={(annotation, _source, item) =>
-              item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null
-            }
-            selectedLines={selected ? { id: file.name, range: selected } : null}
-            onItemEditComplete={(event) => onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>)}
-          />
-        </RightClick>
+        {image ? (
+          <div className="h-full overflow-auto">
+            <ImageDiff file={file} layout={style} />
+          </div>
+        ) : (
+          <RightClick resolve={lineMenu} className="h-full">
+            <CodeView<Meta, undefined>
+              ref={codeView}
+              className="h-full overflow-auto"
+              containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
+              items={items}
+              options={options}
+              renderAnnotation={(annotation, _source, item) =>
+                item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null
+              }
+              selectedLines={selected ? { id: file.name, range: selected } : null}
+              onItemEditComplete={(event) => onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>)}
+            />
+          </RightClick>
+        )}
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { FileDiffMetadata } from "@pierre/diffs";
+import { prepareFileTreeInput } from "@pierre/trees";
 import { firstInRange, rows, treeOrder } from "./lines";
 
 test("rows walk context, deletions then additions with the right line numbers", () => {
@@ -59,4 +60,28 @@ test("treeOrder puts folders first at each level, keeping folders together", () 
     "a.md",
     "b.ts",
   ]);
+});
+
+test("treeOrder agrees with the sidebar tree's own sort, which rejects presorted input it disagrees with", () => {
+  // These crashed the tree: "Builder input must be sorted before appendPaths()".
+  const paths = [
+    "apps/cell/src/App.tsx",
+    "apps/cell/src/Floor.tsx",
+    "apps/cell/src/Floor3D.tsx",
+    "apps/cell/src/floor-data.ts",
+    "apps/cell/src/env.d.ts",
+    "apps/cell/src/plan.worker.ts",
+    "README.md",
+    "readme.md",
+    "a_b.ts",
+    "a-b.ts",
+    "aB.ts",
+    "a10.ts",
+    "a2.ts",
+    "a02.ts",
+    "x/Ab/1.ts",
+    "x/ab/2.ts",
+    "x/a.b/3.ts",
+  ];
+  expect(paths.toSorted(treeOrder)).toEqual([...prepareFileTreeInput(paths).paths]);
 });

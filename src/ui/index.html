@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Shown until the review loads; React draws the same thing (Loading in main.tsx) until then. -->
+    <div id="root"><div class="loading"><img src="./icon.svg" alt="Loading" /></div></div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

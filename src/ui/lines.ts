@@ -68,7 +68,13 @@ export function stats(file: FileDiffMetadata) {
   return { add, del };
 }
 
-/** File tree order: folders before files at each level, then by name. Matches the sidebar tree. */
+/**
+ * File tree order: folders before files at each level, then by name. The sidebar tree
+ * (@pierre/trees, `presorted: true`) checks its input against its own default sort and throws
+ * "Builder input must be sorted" on any disagreement, so this mirrors that sort exactly:
+ * lowercase, digit runs compared as numbers, other text by code unit (not locale), ties broken
+ * by the raw name.
+ */
 export function treeOrder(a: string, b: string) {
   const x = a.split("/");
   const y = b.split("/");
@@ -77,7 +83,47 @@ export function treeOrder(a: string, b: string) {
     const xDir = i < x.length - 1;
     const yDir = i < y.length - 1;
     if (xDir !== yDir) return xDir ? -1 : 1;
-    return x[i].localeCompare(y[i], undefined, { numeric: true, sensitivity: "base" });
+    return compareNames(x[i], y[i]);
   }
   return x.length - y.length;
 }
+
+function compareNames(a: string, b: string) {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  const xt = naturalTokens(x);
+  const yt = naturalTokens(y);
+  if (!(xt.length === 1 && yt.length === 1 && typeof xt[0] === "string" && typeof yt[0] === "string")) {
+    for (let i = 0; i < Math.min(xt.length, yt.length); i++) {
+      const p = xt[i];
+      const q = yt[i];
+      if (p === q) continue;
+      if (typeof p === "number" && typeof q === "number") return p < q ? -1 : 1;
+      if (String(p) !== String(q)) return String(p) < String(q) ? -1 : 1;
+    }
+    if (xt.length !== yt.length) return xt.length < yt.length ? -1 : 1;
+  }
+  if (x !== y) return x < y ? -1 : 1;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/** "a10b" -> ["a", 10, "b"]: text and digit runs, as the tree splits names. */
+function naturalTokens(s: string) {
+  const tokens: (string | number)[] = [];
+  let start = 0;
+  let i = 0;
+  while (i < s.length) {
+    while (i < s.length && !isDigit(s.charCodeAt(i))) i++;
+    if (i >= s.length) break;
+    if (i > start) tokens.push(s.slice(start, i));
+    let n = 0;
+    while (i < s.length && isDigit(s.charCodeAt(i))) n = n * 10 + (s.charCodeAt(i++) - 48);
+    tokens.push(n);
+    start = i;
+  }
+  if (start < s.length || tokens.length === 0) tokens.push(s.slice(start));
+  return tokens;
+}
+
+const isDigit = (c: number) => c >= 48 && c <= 57;

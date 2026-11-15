@@ -157,6 +157,14 @@ export async function readAtRef(root: string, ref: string, path: string): Promis
 // ponytail: unbounded; one review touches a bounded set of files.
 const atRef = new Map<string, Promise<string | null>>();
 
+/** A file's bytes at `ref` (an image, say), or null when it isn't there. */
+export async function bytesAtRef(root: string, ref: string, path: string): Promise<Buffer | null> {
+  const rel = relative(root, resolve(root, path));
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new Error(`path outside repo: ${path}`);
+  const r = await $`git show ${`${ref}:${path}`}`.cwd(root).nothrow().quiet();
+  return r.exitCode === 0 ? r.stdout : null;
+}
+
 export async function readWorking(root: string, path: string): Promise<string | null> {
   const f = Bun.file(safePath(root, path));
   return (await f.exists()) ? f.text() : null;

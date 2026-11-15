@@ -391,6 +391,41 @@ pre[style*="--hls-dark"] span {
   }
 }
 
+/* Behind a changed image: a quiet checkerboard, so transparency reads. */
+.image-backdrop {
+  background-color: var(--page);
+  background-image: conic-gradient(var(--inset) 25%, transparent 0 50%, var(--inset) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}
+
+/* The logo while a review loads (a big one takes seconds). It waits 300ms before fading in,
+   so a quick load never flashes it, then breathes. */
+.loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--page);
+}
+.loading img {
+  width: 56px;
+  height: 56px;
+  opacity: 0;
+  animation:
+    fade-in 240ms ease-out 300ms forwards,
+    loading-breathe 1.6s ease-in-out 540ms infinite;
+}
+@keyframes loading-breathe {
+  50% {
+    transform: scale(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading img {
+    animation: fade-in 240ms ease-out 300ms forwards;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     /* biome-ignore lint/complexity/noImportantStyles: must beat every component's transition */
