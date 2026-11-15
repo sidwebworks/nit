@@ -66,9 +66,9 @@ function ApplyButton({ primary = false }: { primary?: boolean }) {
   );
   const running = st.useStore((s) => s.agent?.state === "running");
   return (
-    <Tooltip label="Apply comments with Claude" keys="Mod+Shift+a" side="top">
+    <Tooltip label="Apply comments with AI" keys="Mod+Shift+a" side="top">
       <Button tone={primary ? "primary" : "secondary"} disabled={!count || running} onClick={() => void agent.apply()}>
-        <Sparks width={14} height={14} /> {running ? "Applying…" : "Apply with Claude"}
+        <Sparks width={14} height={14} /> {running ? "Applying…" : "Apply with AI"}
       </Button>
     </Tooltip>
   );
@@ -78,9 +78,8 @@ function ApplyButton({ primary = false }: { primary?: boolean }) {
 function CoReviewButton() {
   const busy = st.useStore((s) => s.agent?.state === "running" || s.job?.state === "running");
   const reviewing = st.useStore((s) => s.job?.kind === "review" && s.job.state === "running");
-  const who = st.useStore(st.reviewerName);
   return (
-    <Tooltip label={`${who} reviews the diff and proposes comments for you to accept`} side="top">
+    <Tooltip label="AI reviews the diff and proposes comments for you to accept" side="top">
       <Button tone="secondary" disabled={busy} onClick={() => void agent.coreview()}>
         <Sparks width={14} height={14} /> {reviewing ? "Reviewing…" : "Co-review"}
       </Button>
@@ -239,7 +238,7 @@ export function ReviewSheet() {
                               {where(d)}
                             </span>
                             {d.proposal ? (
-                              <Tooltip label="Claude's proposal: accept it on the card to post it">
+                              <Tooltip label="Proposed by AI: accept it on the card to post it">
                                 <Sparks width={13} height={13} className="mt-0.5 shrink-0 text-accent-ink" />
                               </Tooltip>
                             ) : null}

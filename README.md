@@ -2,9 +2,9 @@
 
 <h1 align="center">nit</h1>
 
-A keyboard-first code review tool for engineers who read the code. Claude helps when you ask.
+A keyboard-first code review tool for engineers who read the code. AI helps when you ask.
 
-`nit` opens your branch, or any pull request, in your browser: a fast diff, code navigation that understands the language, search across the whole repository, and the keyboard for everything. You read, comment, and post one review to GitHub. Claude is there when you want a second reader, and stays out of the way when you don't.
+`nit` opens your branch, or any pull request, in your browser: a fast diff, code navigation that understands the language, search across the whole repository, and the keyboard for everything. You read, comment, and post one review to GitHub. AI is there when you want a second reader, and stays out of the way when you don't.
 
 **[sidwebworks.com/things/nit](https://sidwebworks.com/things/nit)**
 
@@ -12,7 +12,7 @@ A keyboard-first code review tool for engineers who read the code. Claude helps 
 
 - **Local.** One binary on your machine. Your reviews, drafts and keys never leave it.
 - **Keyboard first.** Every action has a key, and `⌘K` finds the rest.
-- **Assisted, not driven.** Claude answers when you ask. It never comments, approves or changes code on its own.
+- **Assisted, not driven.** AI answers when you ask. It never comments, approves or changes code on its own.
 
 ## Install
 
@@ -46,9 +46,9 @@ nit starts a local server and opens a tab. Press `⌘K` for every file and actio
 
 ![Repository-wide search](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/search.png)
 
-**Claude, when you ask.** Select lines and press `⌘I`. Claude reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept or drop. Conversations stay on your machine.
+**AI, when you ask.** Select lines and press `⌘I`. The AI reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept or drop. Conversations stay on your machine.
 
-![Asking Claude about the selected lines](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/ask.gif)
+![Asking AI about the selected lines](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/ask.gif)
 
 **Comments and suggestions, posted as one review.** `c` comments on the selected lines; a suggested change shows as a diff, as on GitHub. Drafts save as you type, and the review posts in one go: Comment, Approve or Request changes.
 
@@ -58,7 +58,7 @@ nit starts a local server and opens a tab. Press `⌘K` for every file and actio
 
 ![Settings: your editor and checkout commands](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/settings.png)
 
-**Also:** a reading order Claude suggests, setting aside lockfiles, generated code, tests, docs and whitespace-only changes, re-reviewing files that changed since you viewed them, and the pull request's description, checks, CI-flagged lines and linked Linear issue.
+**Also:** a reading order AI suggests, setting aside lockfiles, generated code, tests, docs and whitespace-only changes, re-reviewing files that changed since you viewed them, and the pull request's description, checks, CI-flagged lines and linked Linear issue.
 
 ## Keyboard
 
@@ -67,7 +67,7 @@ nit starts a local server and opens a tab. Press `⌘K` for every file and actio
 | `j` `k` | Next and previous file |
 | `n` `p` | Next and previous change |
 | `c` | Comment on the selected lines |
-| `⌘I` | Ask Claude about them |
+| `⌘I` | Ask AI about them |
 | `g` `d` | Go to definition |
 | `o` | Open in your editor |
 | `v` | Mark the file viewed |
@@ -79,7 +79,7 @@ nit starts a local server and opens a tab. Press `⌘K` for every file and actio
 
 - **git.** nit reviews the repository you run it in.
 - **GitHub**, for pull requests: your `gh` login, or a token saved in Settings (kept in your keychain).
-- **Claude**, optional: [Claude Code](https://claude.com/claude-code), signed in with your Claude account or an Anthropic API key saved in Settings. Everything else works without it.
+- **AI**, optional: [Claude Code](https://claude.com/claude-code) (your Claude account or an Anthropic API key) or [Codex](https://github.com/openai/codex) (your ChatGPT account or an OpenAI API key), picked in Settings → AI. Everything else works without it.
 
 Reviews, drafts and settings stay on your machine, in `~/.local/share/nit` (or `$NIT_DATA_DIR`). nit talks to GitHub and Anthropic, and nothing else.
 

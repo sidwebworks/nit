@@ -243,7 +243,7 @@ function lineMenu(target: Element): MenuItem[] | null {
       ? [{ label: "Copy", icon: <Copy />, keys: "Mod+c", run: () => copy(picked, "the selection") }, null]
       : []),
     { label: "Comment", icon: <ChatPlusIn />, keys: "c", run: st.startComment },
-    { label: `Ask ${st.reviewerName()}`, icon: <Sparks />, keys: "Mod+i", run: agent.startAsk },
+    { label: "Ask AI", icon: <Sparks />, keys: "Mod+i", run: agent.startAsk },
     ...(side === "additions"
       ? [
           {
@@ -450,7 +450,7 @@ export function DiffPane() {
       list.push({ side: asking.side, lineNumber: asking.end, metadata: { asking: true } });
     // Earlier conversations with Claude, folded under their lines (the open one shows in full).
     for (const t of asks) {
-      if (t.outdated) continue; // its lines are gone; it stays in the Claude panel
+      if (t.outdated) continue; // its lines are gone; it stays in the AI panel
       const path = t.side === "deletions" ? (file.prevName ?? file.name) : file.name;
       if (t.path !== path) continue;
       const open = asking && asking.side === t.side && asking.start === t.start && asking.end === t.end;

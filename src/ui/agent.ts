@@ -32,12 +32,12 @@ function onRun(run: AgentRun) {
 async function finished(run: AgentRun) {
   await st.load(); // the agent's edits are in the review's diff now
   if (run.error === SIGN_IN_ERROR) return needSignIn(() => apply(run.drafts));
-  if (run.state === "failed") return st.fail(`Claude couldn't finish: ${run.error ?? "unknown error"}`);
-  if (run.state === "stopped") return st.toast("Stopped. What Claude changed so far is kept; undo puts it back.");
+  if (run.state === "failed") return st.fail(`AI couldn't finish: ${run.error ?? "unknown error"}`);
+  if (run.state === "stopped") return st.toast("Stopped. What AI changed so far is kept; undo puts it back.");
   const done = run.outcomes.filter((o) => o.status === "done").length;
   const files = run.files.length;
   st.notify(
-    `Claude applied ${done} of ${run.drafts.length} comments · ${files} ${files === 1 ? "file" : "files"} changed`,
+    `AI applied ${done} of ${run.drafts.length} comments · ${files} ${files === 1 ? "file" : "files"} changed`,
     files ? { label: "Show changes", run: showChanges } : undefined,
   );
 }
@@ -72,7 +72,7 @@ async function jobFinished(job: Job) {
             label: "Settings",
             run: openReviewerSettings,
           })
-        : st.fail(`${job.reviewer === "codex" ? "Codex" : "Claude"} couldn't finish: ${job.error ?? "unknown error"}`);
+        : st.fail(`AI couldn't finish: ${job.error ?? "unknown error"}`);
   // A finished answer is saved with its lines' conversation: fetch those to show it there.
   if (job.kind === "ask" && job.state === "done")
     return void api.asks().then(
@@ -86,9 +86,8 @@ async function jobFinished(job: Job) {
   if (job.state === "stopped" || job.kind !== "review") return;
   await st.load(); // the proposals are drafts now
   const dropped = job.dropped.length ? ` · ${job.dropped.length} dropped by checks` : "";
-  const who = job.reviewer === "codex" ? "Codex" : "Claude";
-  if (!job.found) return st.toast(`${who} found nothing worth raising${dropped}`);
-  st.notify(`${who} proposed ${job.found} ${job.found === 1 ? "comment" : "comments"}${dropped}`, {
+  if (!job.found) return st.toast(`AI found nothing worth raising${dropped}`);
+  st.notify(`AI proposed ${job.found} ${job.found === 1 ? "comment" : "comments"}${dropped}`, {
     label: "Review",
     run: () => {
       const first = st.orderedDrafts().find((d) => d.proposal);
@@ -160,7 +159,7 @@ export async function ask(question: string, lines = st.get().asking) {
     const { job } = await api.ask({ ...at, question, followUp });
     st.set({ job, agentActivity: [] });
   } catch (e) {
-    st.fail(e instanceof Error ? e.message : "Couldn't ask Claude.");
+    st.fail(e instanceof Error ? e.message : "Couldn't ask AI.");
   }
 }
 
@@ -216,7 +215,7 @@ export async function apply(ids?: string[]) {
     const { run } = await api.applyAgent(ids);
     st.set({ agent: run, agentActivity: [], agentOpen: true, reviewOpen: false });
   } catch (e) {
-    st.fail(e instanceof Error ? e.message : "Couldn't start Claude.");
+    st.fail(e instanceof Error ? e.message : "Couldn't start AI.");
   }
 }
 
@@ -233,7 +232,7 @@ export async function undo() {
     st.toast(
       r.kept.length
         ? `Undid ${r.restored.length} files; kept ${r.kept.join(", ")} (edited since)`
-        : `Undid Claude's changes to ${r.restored.length} ${r.restored.length === 1 ? "file" : "files"}`,
+        : `Undid AI's changes to ${r.restored.length} ${r.restored.length === 1 ? "file" : "files"}`,
     );
   } catch (e) {
     st.fail(e instanceof Error ? e.message : "Couldn't undo.");

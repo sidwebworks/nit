@@ -94,7 +94,7 @@ export async function runCodex(o: CodexJob): Promise<{ structured?: unknown; ans
   const apiKey = usingKey ? await savedCodexKey() : null;
   if (usingKey && !apiKey)
     throw new Error(
-      "Settings → Reviewer is set to use an OpenAI API key for Codex, but none is saved. Add one there, or switch to your Codex sign-in.",
+      "Settings → AI is set to use an OpenAI API key for Codex, but none is saved. Add one there, or switch to your Codex sign-in.",
     );
   const bin = codexBinary();
   if (!bin)

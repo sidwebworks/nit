@@ -57,7 +57,7 @@ export function ChangesPane() {
         <IconButton label="Back to the review" keys="Esc" onClick={back}>
           <ArrowLeft />
         </IconButton>
-        <span className="text-[13px] font-medium text-ink">Claude's changes</span>
+        <span className="text-[13px] font-medium text-ink">AI changes</span>
         <span className="text-[12px] text-ink-3 tabular-nums">
           {files.length} {files.length === 1 ? "file" : "files"}
         </span>
@@ -73,7 +73,7 @@ export function ChangesPane() {
       <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
         {error ? <p className="text-[12.5px] text-ink-3">{error}</p> : null}
         {patch !== null && !files.length && !error ? (
-          <p className="text-[12.5px] text-ink-3">Claude's last pass didn't change any files.</p>
+          <p className="text-[12.5px] text-ink-3">The last AI pass didn't change any files.</p>
         ) : null}
         {files.map((f) => {
           const { add, del } = stats(f);

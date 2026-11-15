@@ -166,7 +166,7 @@ export function targetOf(root: string, input: Record<string, unknown>) {
 }
 
 export function createAgent(root: string, snapshots: Snapshots, store: Store) {
-  // Whether this pass bills nit's saved API key (Settings → Claude), set as each one starts; one
+  // Whether this pass bills nit's saved API key (Settings → AI), set as each one starts; one
   // pass runs at a time.
   let keyed = false;
   const usingKey = () => keyed;
@@ -176,7 +176,7 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
     // Asked for an API key and there's none: say so, rather than quietly using the login.
     if (wantsKey && !keyed)
       throw new Error(
-        "Settings → Claude is set to sign in with an API key, but none is saved. Add one there, or switch back to the Claude Code login.",
+        "Settings → AI is set to sign in with an API key, but none is saved. Add one there, or switch back to the Claude Code login.",
       );
   };
   let current: { run: AgentRun; abort: AbortController; events: AgentEvent[] } | null = null;
@@ -195,7 +195,6 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
   const confineReview = confineTo(root, { guidelinesFromBase: true });
   let job: { job: Job; abort: AbortController } | null = null;
   const busy = () => current !== null || job !== null;
-  const reviewerName = () => (prefsOf(store).reviewer === "codex" ? "Codex" : "Claude");
   const announce = (j: Job) => emit({ type: "job", job: j });
 
   return {
@@ -219,7 +218,7 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
       drafts: Draft[],
       context: { guidelines: string; tools: NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]> },
     ): Promise<AgentRun> {
-      if (busy()) throw new Error("Claude is already working on this review.");
+      if (busy()) throw new Error("AI is already working on this review.");
       const previous = store.agentRun();
       const run: AgentRun = {
         id: crypto.randomUUID(),
@@ -326,11 +325,10 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
         finish?: (structured: unknown, j: Job) => Promise<void>;
       },
     ): Promise<Job> {
-      if (busy()) throw new Error(`${reviewerName()} is already working on this review.`);
+      if (busy()) throw new Error("AI is already working on this review.");
       const j: Job = {
         id: crypto.randomUUID(),
         kind,
-        reviewer: prefsOf(store).reviewer,
         state: "running",
         startedAt: Date.now(),
         endedAt: null,

@@ -387,9 +387,9 @@ function Card({ draft, focused }: { draft: Draft; focused: boolean }) {
         {proposal ? (
           <>
             <Sparks width={13} height={13} className="shrink-0 text-accent-ink" aria-hidden />
-            <span className="font-medium text-ink">Claude</span>
+            <span className="font-medium text-ink">AI</span>
             {proposal.verdict === "PLAUSIBLE" ? (
-              <Tooltip label="Rests on one thing Claude couldn't verify">
+              <Tooltip label="Rests on one thing the AI couldn't verify">
                 <span className="rounded-chip bg-hover-2 px-1.5 py-px text-[11px] text-ink-3">unverified</span>
               </Tooltip>
             ) : null}

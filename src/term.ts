@@ -252,13 +252,12 @@ const failed = (what: string, error: string | null) => log(`${c.red("✕")} ${wh
 
 const running = new Set<string>();
 function job(j: Job) {
-  const who = j.reviewer === "codex" ? "Codex" : "Claude";
   const what =
     j.kind === "review"
-      ? `${who} reviewing the diff`
+      ? "AI reviewing the diff"
       : j.kind === "guide"
-        ? `${who} ordering the files`
-        : `${who} answering about ${where(j)}`;
+        ? "AI ordering the files"
+        : `AI answering about ${where(j)}`;
   if (j.state === "running") {
     if (!running.has(j.id)) {
       running.add(j.id);
@@ -279,7 +278,7 @@ function job(j: Job) {
 }
 
 function run(r: AgentRun) {
-  const what = `Claude applying ${plural(r.drafts.length, "comment")}`;
+  const what = `AI applying ${plural(r.drafts.length, "comment")}`;
   if (r.state === "running") {
     if (!running.has(r.id)) {
       running.add(r.id);
@@ -291,7 +290,7 @@ function run(r: AgentRun) {
   if (!running.delete(r.id)) return;
   idle();
   if (r.state === "stopped")
-    return log(`${c.dim("·")} stopped; what Claude changed is kept ${took(r.startedAt, r.endedAt)}`);
+    return log(`${c.dim("·")} stopped; what AI changed is kept ${took(r.startedAt, r.endedAt)}`);
   if (r.state === "failed") return failed("apply", r.error);
   const done = r.outcomes.filter((o) => o.status === "done").length;
   log(

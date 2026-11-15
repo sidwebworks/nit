@@ -314,7 +314,7 @@ function Reviewer() {
   const codexStatus = statusOf("Codex", codex, p.codexAuth === "apiKey");
   return (
     <>
-      <fieldset aria-label="Reviewer" className="mt-1 flex gap-3">
+      <fieldset aria-label="AI provider" className="mt-1 flex gap-3">
         <ReviewerCard
           name="Claude Code"
           maker="Anthropic"
@@ -793,8 +793,8 @@ const SECTIONS = [
   },
   {
     id: "reviewer",
-    group: "AI",
-    label: "Reviewer",
+    group: "General",
+    label: "AI",
     icon: <Sparks />,
     body: Reviewer,
     about: "Who answers your questions, suggests a reading order and co-reviews. Only when you ask.",

@@ -154,7 +154,7 @@ export const actions: Action[] = [
   {
     id: "agent-apply",
     group: "Review",
-    label: "Apply comments with Claude",
+    label: "Apply comments with AI",
     keys: ["Mod+Shift+a"],
     icon: <Sparks />,
     when: () => st.get().agent?.state !== "running" && st.get().drafts.some((d) => !d.replyTo),
@@ -208,7 +208,7 @@ export const actions: Action[] = [
   {
     id: "agent-panel",
     group: "Review",
-    label: "Claude: questions and passes",
+    label: "AI: questions and passes",
     keys: ["Mod+Shift+i"],
     icon: <Sparks />,
     when: () => st.get().agent !== null || st.get().asks.length > 0 || st.get().job !== null,

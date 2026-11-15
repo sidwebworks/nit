@@ -604,7 +604,7 @@ const serve = (p: number) =>
               outputFormat: GUIDE_SCHEMA,
               finish: async (out) => {
                 const chapters = (out as { chapters?: GuideChapter[] } | undefined)?.chapters;
-                if (!chapters?.length) throw new Error("Claude didn't return a reading order.");
+                if (!chapters?.length) throw new Error("AI didn't return a reading order.");
                 store.setSetting(guideKey, placeGuide(chapters, changedPaths(text)));
               },
             });
@@ -1006,7 +1006,7 @@ void (prefsOf(store).reviewer === "codex" ? codexStatus() : Promise.resolve(null
     ]);
   else if (!c.loggedIn && !c.hasKey)
     term.log(`${term.c.yellow("!")} Codex isn't signed in, so Codex features are off.`, [
-      term.c.dim("Run `codex login`. Or save an OpenAI API key in Settings → Reviewer."),
+      term.c.dim("Run `codex login`. Or save an OpenAI API key in Settings → AI."),
     ]);
 });
 void (prefsOf(store).reviewer === "codex" ? Promise.resolve(null) : authStatus()).then((a) => {
@@ -1017,6 +1017,6 @@ void (prefsOf(store).reviewer === "codex" ? Promise.resolve(null) : authStatus()
     ]);
   else if (!a.loggedIn && !a.hasKey)
     term.log(`${term.c.yellow("!")} Claude isn't signed in, so Claude features are off.`, [
-      term.c.dim("Run `claude`, then /login. Or save an API key in Settings → Reviewer."),
+      term.c.dim("Run `claude`, then /login. Or save an API key in Settings → AI."),
     ]);
 });

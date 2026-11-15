@@ -25,12 +25,11 @@ function GuideButton() {
   const on = st.useStore((s) => s.prefs.guided && !!s.data?.guide);
   const busy = st.useStore((s) => s.job?.state === "running" || s.agent?.state === "running");
   const ordering = st.useStore((s) => s.job?.state === "running" && s.job.kind === "guide");
-  const who = st.useStore(st.reviewerName);
   const label = has
     ? on
       ? "Show the files as a tree"
       : "Show the suggested reading order"
-    : `Ask ${who} for a reading order`;
+    : "Ask AI for a reading order";
   return (
     <button
       type="button"
@@ -99,7 +98,6 @@ function HideMenu({ hidden }: { hidden: number }) {
 export function FileList() {
   const agentRunning = st.useStore((s) => s.agent?.state === "running" || s.job?.state === "running");
   const jobKind = st.useStore((s) => (s.job?.state === "running" ? s.job.kind : null));
-  const jobWho = st.useStore((s) => (s.job?.reviewer === "codex" ? "Codex" : "Claude"));
   const agentCount = st.useStore((s) => s.agent?.drafts.length ?? 0);
   const width = st.useStore((s) => s.widths.files);
   const files = st.useStore((s) => s.files);
@@ -194,12 +192,12 @@ export function FileList() {
             <span className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
             <span className="truncate">
               {jobKind === "review"
-                ? `${jobWho} is reviewing…`
+                ? "AI is reviewing…"
                 : jobKind === "ask"
-                  ? `${jobWho} is answering…`
+                  ? "AI is answering…"
                   : jobKind === "guide"
-                    ? `${jobWho} is ordering the files…`
-                    : `Claude is applying ${agentCount}…`}
+                    ? "AI is ordering the files…"
+                    : `AI is applying ${agentCount}…`}
             </span>
           </button>
         ) : (

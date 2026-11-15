@@ -128,7 +128,7 @@ export function AgentPanel() {
                 <span className="size-3.5 shrink-0 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
               ) : null}
               <div className="min-w-0 flex-1">
-                <Sheet.Title className="text-[14px] font-medium text-ink">Claude</Sheet.Title>
+                <Sheet.Title className="text-[14px] font-medium text-ink">AI</Sheet.Title>
                 <Sheet.Description className="truncate text-[12px] text-ink-3 tabular-nums">
                   {run ? summary(run) : "Your questions, co-review and applied comments"}
                 </Sheet.Description>
@@ -235,7 +235,7 @@ export function AgentPanel() {
                     <div className="flex flex-col items-center gap-1 px-6 py-16 text-center">
                       <span className="text-ink-2">Nothing applied yet</span>
                       <span className="text-[12px] text-ink-3">
-                        Write comments, then Apply with Claude from the review (<Kbd k="Mod+Shift+Enter" />
+                        Write comments, then Apply with AI from the review (<Kbd k="Mod+Shift+Enter" />
                         ).
                       </span>
                     </div>

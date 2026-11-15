@@ -482,9 +482,6 @@ export function setPrefs(patch: Partial<Prefs>) {
   );
 }
 
-/** Who answers questions, orders the files and co-reviews, by name. */
-export const reviewerName = (s: State = state) => (s.prefs.reviewer === "codex" ? "Codex" : "Claude");
-
 /** Whether the file list sets this file aside (Hide generated / tests / docs / viewed). */
 export function hiddenFile(name: string, s: State = state) {
   const c = s.categories[name];
