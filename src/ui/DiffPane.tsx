@@ -479,13 +479,17 @@ export function DiffPane() {
   }, [cursor, anchor, suggestingHere]);
 
   useEffect(() => {
-    if (cursor && file)
+    if (!cursor || !file) return;
+    // A drawn row gets the usual centre-or-nudge; CodeView only draws rows near the viewport,
+    // so a far jump asks it to centre the line instead.
+    if (findRow(cursor.side, cursor.line)) revealLine(cursor.side, cursor.line, 0);
+    else
       codeView.current?.scrollTo({
         type: "line",
         id: file.name,
         lineNumber: cursor.line,
         side: cursor.side,
-        align: "nearest",
+        align: "center",
         behavior: "instant",
       });
   }, [cursor, file]);
