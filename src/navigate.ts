@@ -325,8 +325,11 @@ export async function createNavigator(root: string, mergeBase: string, patch: ()
       };
     },
 
-    async symbols(path: string, prev: string | null) {
-      const [now, before] = await Promise.all([parsed(path, "additions"), parsed(prev ?? path, "deletions")]);
+    async symbols(path: string, prev: string | null, includeOld = true) {
+      const [now, before] = await Promise.all([
+        parsed(path, "additions"),
+        includeOld ? parsed(prev ?? path, "deletions") : Promise.resolve(null),
+      ]);
       return { new: now?.parsed?.outline ?? null, old: before?.parsed?.outline ?? null };
     },
 

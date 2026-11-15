@@ -41,7 +41,7 @@ export function FilePane() {
   useEffect(() => {
     if (!path) return;
     let alive = true;
-    nav.loadOutline(path);
+    nav.loadOutline(path, undefined, false);
     textOf(path).then(
       (contents) => {
         if (!alive) return;

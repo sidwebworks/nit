@@ -107,9 +107,12 @@ export function load(grammar: Grammar): Promise<Loaded> {
       const parser = new Parser();
       parser.setLanguage(language);
       const g = GRAMMARS[grammar];
+      let query: Query | undefined;
       return {
         parser,
-        query: new Query(language, g.query),
+        get query() {
+          return (query ??= new Query(language, g.query));
+        },
         outline: g.outline ? new Query(language, g.outline) : null,
       };
     })();
@@ -133,11 +136,20 @@ export async function parse(key: string, path: string, source: string): Promise<
   }
   const grammar = grammarFor(path);
   if (!grammar) return null;
-  const { parser, query, outline: outlineQuery } = await load(grammar);
-  const tree = parser.parse(source);
+  const loaded = await load(grammar);
+  const tree = loaded.parser.parse(source);
   if (!tree) return null;
-  const symbols = definitions(tree, query);
-  const entry = { tree, grammar, symbols, outline: outlineQuery ? outline(tree, outlineQuery) : symbols };
+  // The outline has its own query for JS/TS; navigation pays for definitions only when used.
+  let symbols: Sym[] | undefined;
+  const getSymbols = () => (symbols ??= definitions(tree, loaded.query));
+  const entry: Parsed = {
+    tree,
+    grammar,
+    get symbols() {
+      return getSymbols();
+    },
+    outline: loaded.outline ? outline(tree, loaded.outline) : getSymbols(),
+  };
   parsed.set(key, entry);
   if (parsed.size > MAX_PARSED) {
     const [oldest, value] = parsed.entries().next().value!;

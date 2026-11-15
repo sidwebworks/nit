@@ -1,12 +1,14 @@
 import {
+  type CodeViewDiffItem,
   type DiffLineAnnotation,
   type DiffTokenEventBaseProps,
   type FileDiffEditCompleteEvent,
   type FileDiffMetadata,
   parseDiffFromFile,
   type SelectedLineRange,
+  type TokenEventBase,
 } from "@pierre/diffs";
-import { FileDiff } from "@pierre/diffs/react";
+import { CodeView, type CodeViewHandle } from "@pierre/diffs/react";
 import {
   AlignJustify,
   ArrowRight,
@@ -24,7 +26,7 @@ import {
   Sparks,
   ViewColumns2,
 } from "iconoir-react/regular";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Side } from "../types";
 import { AskAnnotation, AskChip } from "./Ask";
 import * as agent from "./agent";
@@ -51,6 +53,9 @@ type Meta =
   | { asking: true }
   | { ask: string }
   | { ci: string };
+
+// CodeView only updates a controlled item when its version changes.
+let nextDiffVersion = 0;
 
 /** Under the lines being edited into a suggestion: what's happening and how to finish. */
 function SuggestingBar() {
@@ -353,6 +358,7 @@ function useSinceViewed(file: FileDiffMetadata | null, on: boolean) {
 }
 
 export function DiffPane() {
+  const codeView = useRef<CodeViewHandle<Meta, undefined>>(null);
   const file = st.useStore((s) => st.currentFile(s));
   const style = st.useStore((s) => s.style);
   // Pierre throws on expandUnchanged for a partial diff, so only once the file's full text is in.
@@ -392,13 +398,14 @@ export function DiffPane() {
         st.setSelection(toPoint(range.side, range.start), toPoint(range.endSide ?? range.side, range.end));
         st.startComment();
       },
-      onTokenEnter: (t: DiffTokenEventBaseProps, e: PointerEvent) => {
+      onTokenEnter: (t: TokenEventBase | DiffTokenEventBaseProps, e: PointerEvent) => {
+        if (!("side" in t)) return;
         const at = tokenAt(t.side, t.lineNumber);
         if (at) tokenLink.enter(t.tokenElement, e, at, t.lineCharStart);
       },
-      onTokenLeave: (t: DiffTokenEventBaseProps) => tokenLink.leave(t.tokenElement),
-      onTokenClick: async (t: DiffTokenEventBaseProps, e: MouseEvent) => {
-        if (!linkKey(e)) return;
+      onTokenLeave: (t: TokenEventBase | DiffTokenEventBaseProps) => tokenLink.leave(t.tokenElement),
+      onTokenClick: async (t: TokenEventBase | DiffTokenEventBaseProps, e: MouseEvent) => {
+        if (!("side" in t) || !linkKey(e)) return;
         e.preventDefault();
         const at = tokenAt(t.side, t.lineNumber);
         if (!at || !(await tokenLink.symbolAt(at, t.lineCharStart))) return;
@@ -472,8 +479,16 @@ export function DiffPane() {
   }, [cursor, anchor, suggestingHere]);
 
   useEffect(() => {
-    if (cursor) revealLine(cursor.side, cursor.line);
-  }, [cursor]);
+    if (cursor && file)
+      codeView.current?.scrollTo({
+        type: "line",
+        id: file.name,
+        lineNumber: cursor.line,
+        side: cursor.side,
+        align: "nearest",
+        behavior: "instant",
+      });
+  }, [cursor, file]);
 
   const renderAnnotation = useCallback(
     (a: DiffLineAnnotation<Meta>) =>
@@ -493,6 +508,24 @@ export function DiffPane() {
         <DraftAnnotation id={a.metadata.id} />
       ),
     [],
+  );
+
+  const items = useMemo<CodeViewDiffItem<Meta>[]>(
+    () =>
+      file
+        ? [
+            {
+              id: file.name,
+              type: "diff",
+              version: ++nextDiffVersion,
+              fileDiff: sinceDiff ?? file,
+              // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
+              annotations: sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations,
+              edit: !!suggestingHere && !suggestingHere.ending,
+            },
+          ]
+        : [],
+    [file, sinceDiff, annotations, suggestingHere],
   );
 
   if (!file) return null;
@@ -583,18 +616,19 @@ export function DiffPane() {
         </div>
         {outlineOpen ? null : <OutlineToggle />}
       </header>
-      <div data-diff-scroll className="min-h-0 flex-1 overflow-auto">
-        <RightClick resolve={lineMenu}>
-          <FileDiff<Meta, undefined>
-            key={sinceDiff ? `since:${file.name}` : file.name}
-            fileDiff={sinceDiff ?? file}
+      <div className="min-h-0 flex-1">
+        <RightClick resolve={lineMenu} className="h-full">
+          <CodeView<Meta, undefined>
+            ref={codeView}
+            className="h-full overflow-auto"
+            containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
+            items={items}
             options={options}
-            // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
-            lineAnnotations={sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations}
-            renderAnnotation={renderAnnotation}
-            selectedLines={selected}
-            edit={!!suggestingHere && !suggestingHere.ending}
-            onEditComplete={onEditComplete}
+            renderAnnotation={(annotation, _source, item) =>
+              item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null
+            }
+            selectedLines={selected ? { id: file.name, range: selected } : null}
+            onItemEditComplete={(event) => onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>)}
           />
         </RightClick>
       </div>

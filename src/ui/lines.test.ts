@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { FileDiffMetadata } from "@pierre/diffs";
-import { rows, treeOrder } from "./lines";
+import { firstInRange, rows, treeOrder } from "./lines";
 
 test("rows walk context, deletions then additions with the right line numbers", () => {
   const file = {
@@ -29,6 +29,13 @@ test("full rows fill the unchanged lines around hunks", () => {
   const got = rows(file, true).map((r) => `${r.side[0]}${r.line}`);
   expect(got).toEqual(["a1", "a2", "d3", "a3", "a4", "a5", "a6", "a7", "a8"]);
   expect(rows(file).map((r) => `${r.side[0]}${r.line}`)).toEqual(["d3", "a3"]);
+});
+
+test("a changed symbol jumps to its edit inside the span", () => {
+  const edits = [5329, 25501, 25513, 25525, 31411];
+  expect(firstInRange(edits, 25333, 30000)).toBe(25501);
+  expect(firstInRange(edits, 30122, 34000)).toBe(31411);
+  expect(firstInRange(edits, 25502, 25512)).toBeUndefined();
 });
 
 test("treeOrder puts folders first at each level, keeping folders together", () => {
