@@ -19,7 +19,6 @@ import {
   Expand,
   Link,
   List,
-  NavArrowRight,
   OpenNewWindow,
   Page,
   SidebarExpand,
@@ -33,6 +32,7 @@ import * as agent from "./agent";
 import { type At, api } from "./api";
 import { HIGHLIGHTER } from "./Code";
 import { DraftAnnotation } from "./Comments";
+import { FilePath } from "./FilePath";
 import { stats } from "./lines";
 import { copy, type MenuItem, RightClick, selectedText } from "./Menu";
 import * as nav from "./nav";
@@ -43,7 +43,7 @@ import * as st from "./state";
 import * as suggest from "./suggest";
 import { ThreadAnnotation } from "./Threads";
 import { useTheme } from "./theme";
-import { Button, basename, dirname, IconButton, Segmented, TextSegmented, Toggle, Tooltip } from "./ui";
+import { Button, IconButton, Segmented, TextSegmented, Toggle, Tooltip } from "./ui";
 
 type Meta =
   | { id: string }
@@ -534,7 +534,6 @@ export function DiffPane() {
 
   if (!file) return null;
   const { add, del } = stats(sinceDiff ?? file); // the counts follow the view
-  const dirs = dirname(file.name).split("/").filter(Boolean);
   // Which function or class the cursor is in, from the side it's on.
   const scope = cursor
     ? nav.enclosing(cursor.side === "additions" ? outline?.new : outline?.old, cursor.line).slice(-2)
@@ -548,26 +547,7 @@ export function DiffPane() {
             <SidebarExpand />
           </IconButton>
         ) : null}
-        <nav aria-label="File path" className="flex min-w-0 items-center gap-1 overflow-hidden text-[13px]">
-          {file.prevName ? (
-            <span className="truncate text-ink-3" title={`Renamed from ${file.prevName}`}>
-              {basename(file.prevName)} →
-            </span>
-          ) : null}
-          {dirs.map((d, i) => (
-            <span key={`${i}:${d}`} className="flex shrink items-center gap-1 truncate text-ink-3">
-              <span className="truncate">{d}</span>
-              <span className="text-line-strong">/</span>
-            </span>
-          ))}
-          <span className="min-w-[4ch] truncate font-medium text-ink">{basename(file.name)}</span>
-          {scope.map((sym) => (
-            <span key={`${sym.line}:${sym.name}`} className="flex min-w-0 shrink items-center gap-1 text-ink-2">
-              <NavArrowRight width={12} height={12} className="shrink-0 text-ink-3" />
-              <span className="truncate font-mono text-[12px]">{sym.name}</span>
-            </span>
-          ))}
-        </nav>
+        <FilePath path={file.name} previous={file.prevName?.split("/").pop()} scope={scope} />
         <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
           <span className="text-green">+{add}</span>
           <span className="text-red">−{del}</span>

@@ -1,16 +1,17 @@
 import type { TokenEventBase } from "@pierre/diffs";
 import { File } from "@pierre/diffs/react";
-import { ArrowLeft, NavArrowRight, SidebarExpand, Xmark } from "iconoir-react/regular";
+import { ArrowLeft, SidebarExpand, Xmark } from "iconoir-react/regular";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { HIGHLIGHTER } from "./Code";
 import { DIFF_CSS, linkKey, revealLine, tokenLink } from "./DiffPane";
+import { FilePath } from "./FilePath";
 import * as nav from "./nav";
 import { OutlineToggle } from "./Outline";
 import { PeekAnnotation } from "./Peek";
 import * as st from "./state";
 import { useTheme } from "./theme";
-import { basename, dirname, IconButton, Kbd } from "./ui";
+import { IconButton, Kbd } from "./ui";
 
 const texts = new Map<string, Promise<string | null>>();
 export const textOf = (path: string) => {
@@ -98,7 +99,6 @@ export function FilePane() {
   // pnpm's store paths are unreadable; a dependency shows from its package name on.
   const dep = browse.path.lastIndexOf("node_modules/");
   const shown = dep === -1 ? browse.path : browse.path.slice(dep + "node_modules/".length);
-  const dirs = dirname(shown).split("/").filter(Boolean);
   const scope = nav.enclosing(outline?.new, browse.line).slice(-2);
   const file = contents !== null ? { name: browse.path, contents, cacheKey: browse.path } : null;
 
@@ -113,23 +113,7 @@ export function FilePane() {
         <IconButton label="Back" keys="Mod+[" onClick={nav.goBack}>
           <ArrowLeft />
         </IconButton>
-        <nav aria-label="File path" className="flex min-w-0 items-center gap-1 overflow-hidden text-[13px]">
-          {dirs.map((d, i) => (
-            <span key={`${i}:${d}`} className="flex shrink items-center gap-1 truncate text-ink-3">
-              <span className="truncate">{d}</span>
-              <span className="text-line-strong">/</span>
-            </span>
-          ))}
-          <span className="min-w-[4ch] truncate font-medium text-ink" title={browse.path}>
-            {basename(shown)}
-          </span>
-          {scope.map((sym) => (
-            <span key={`${sym.line}:${sym.name}`} className="flex min-w-0 shrink items-center gap-1 text-ink-2">
-              <NavArrowRight width={12} height={12} className="shrink-0 text-ink-3" />
-              <span className="truncate font-mono text-[12px]">{sym.name}</span>
-            </span>
-          ))}
-        </nav>
+        <FilePath path={shown} fullPath={browse.path} scope={scope} />
         <span className="shrink-0 rounded-chip bg-hover px-1.5 py-px text-[11.5px] text-ink-3">
           {dep === -1 ? "Not in this review" : "Dependency"}
         </span>
