@@ -398,7 +398,7 @@ const serve = (p: number) =>
           const path = q.get("path") ?? "";
           if (!validPath(path)) return fail(400, "invalid path");
           const prev = q.get("prev");
-          return json(await nav.symbols(path, prev && validPath(prev) ? prev : null));
+          return json(await nav.symbols(path, prev && validPath(prev) ? prev : null, q.get("old") !== "0"));
         }),
       },
       "/api/identifiers": {

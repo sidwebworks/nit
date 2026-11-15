@@ -107,9 +107,12 @@ export function load(grammar: Grammar): Promise<Loaded> {
       const parser = new Parser();
       parser.setLanguage(language);
       const g = GRAMMARS[grammar];
+      let query: Query | undefined;
       return {
         parser,
-        query: new Query(language, g.query),
+        get query() {
+          return (query ??= new Query(language, g.query));
+        },
         outline: g.outline ? new Query(language, g.outline) : null,
       };
     })();
@@ -120,7 +123,7 @@ export function load(grammar: Grammar): Promise<Loaded> {
 
 // Parsed files, keyed by caller (path + version). Trees hold WASM memory, so old ones are freed.
 /** `symbols` are definitions (for navigation); `outline` is what a reader scans the file by. */
-type Parsed = { tree: Tree; grammar: Grammar; symbols: Sym[]; outline: Sym[] };
+type Parsed = { tree: Tree; grammar: Grammar; symbols: Sym[]; outline: Sym[]; release(): void };
 const parsed = new Map<string, Parsed>();
 const MAX_PARSED = 200;
 
@@ -133,16 +136,43 @@ export async function parse(key: string, path: string, source: string): Promise<
   }
   const grammar = grammarFor(path);
   if (!grammar) return null;
-  const { parser, query, outline: outlineQuery } = await load(grammar);
-  const tree = parser.parse(source);
+  const loaded = await load(grammar);
+  const tree = loaded.parser.parse(source);
   if (!tree) return null;
-  const symbols = definitions(tree, query);
-  const entry = { tree, grammar, symbols, outline: outlineQuery ? outline(tree, outlineQuery) : symbols };
+  // The outline has its own query for JS/TS; navigation pays for definitions only when used.
+  let symbols: Sym[] | undefined;
+  let retainedSource: string | null = source;
+  let live = true;
+  const getSymbols = () => {
+    if (symbols) return symbols;
+    const target = live ? tree : loaded.parser.parse(retainedSource!);
+    if (!target) return [];
+    try {
+      symbols = definitions(target, loaded.query);
+      retainedSource = null;
+      return symbols;
+    } finally {
+      if (!live) target.delete();
+    }
+  };
+  const entry: Parsed = {
+    tree,
+    grammar,
+    release() {
+      live = false;
+      tree.delete();
+    },
+    get symbols() {
+      return getSymbols();
+    },
+    outline: loaded.outline ? outline(tree, loaded.outline) : getSymbols(),
+  };
   parsed.set(key, entry);
   if (parsed.size > MAX_PARSED) {
     const [oldest, value] = parsed.entries().next().value!;
     parsed.delete(oldest);
-    value.tree.delete();
+    // A caller retaining the entry can still derive definitions from its source if needed.
+    value.release();
   }
   return entry;
 }
@@ -167,12 +197,14 @@ function definitions(tree: Tree, query: Query): Sym[] {
       name: name.node.text,
       kind,
       line: def.node.startPosition.row + 1,
+      startCol: def.node.startPosition.column,
       endLine: def.node.endPosition.row + 1,
+      endCol: def.node.endPosition.column,
       nameLine: name.node.startPosition.row + 1,
       nameCol: name.node.startPosition.column,
     });
   }
-  return out.sort((a, b) => a.line - b.line || b.endLine - a.endLine);
+  return out.sort((a, b) => a.line - b.line || (a.startCol ?? 0) - (b.startCol ?? 0) || b.endLine - a.endLine);
 }
 
 const IDENT = /identifier|^name$|^constant$|^field$|^property$/;
@@ -202,12 +234,14 @@ function outline(tree: Tree, query: Query): Sym[] {
       name: kind === "test" || kind === "suite" ? unquote(name.node.text) : name.node.text,
       kind,
       line: item.node.startPosition.row + 1,
+      startCol: item.node.startPosition.column,
       endLine: item.node.endPosition.row + 1,
+      endCol: item.node.endPosition.column,
       nameLine: name.node.startPosition.row + 1,
       nameCol: name.node.startPosition.column,
     });
   }
-  return out.sort((a, b) => a.line - b.line || b.endLine - a.endLine);
+  return out.sort((a, b) => a.line - b.line || (a.startCol ?? 0) - (b.startCol ?? 0) || b.endLine - a.endLine);
 }
 
 /** The identifier at a 1-based line and 0-based column, or null on punctuation, strings, comments. */

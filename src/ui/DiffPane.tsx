@@ -1,12 +1,14 @@
 import {
+  type CodeViewDiffItem,
   type DiffLineAnnotation,
   type DiffTokenEventBaseProps,
   type FileDiffEditCompleteEvent,
   type FileDiffMetadata,
   parseDiffFromFile,
   type SelectedLineRange,
+  type TokenEventBase,
 } from "@pierre/diffs";
-import { FileDiff } from "@pierre/diffs/react";
+import { CodeView, type CodeViewHandle } from "@pierre/diffs/react";
 import {
   AlignJustify,
   ArrowRight,
@@ -17,20 +19,20 @@ import {
   Expand,
   Link,
   List,
-  NavArrowRight,
   OpenNewWindow,
   Page,
   SidebarExpand,
   Sparks,
   ViewColumns2,
 } from "iconoir-react/regular";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Side } from "../types";
 import { AskAnnotation, AskChip } from "./Ask";
 import * as agent from "./agent";
 import { type At, api } from "./api";
 import { HIGHLIGHTER } from "./Code";
 import { DraftAnnotation } from "./Comments";
+import { FilePath } from "./FilePath";
 import { stats } from "./lines";
 import { copy, type MenuItem, RightClick, selectedText } from "./Menu";
 import * as nav from "./nav";
@@ -41,7 +43,7 @@ import * as st from "./state";
 import * as suggest from "./suggest";
 import { ThreadAnnotation } from "./Threads";
 import { useTheme } from "./theme";
-import { Button, basename, dirname, IconButton, Segmented, TextSegmented, Toggle, Tooltip } from "./ui";
+import { Button, IconButton, Segmented, TextSegmented, Toggle, Tooltip } from "./ui";
 
 type Meta =
   | { id: string }
@@ -51,6 +53,9 @@ type Meta =
   | { asking: true }
   | { ask: string }
   | { ci: string };
+
+// CodeView only updates a controlled item when its version changes.
+let nextDiffVersion = 0;
 
 /** Under the lines being edited into a suggestion: what's happening and how to finish. */
 function SuggestingBar() {
@@ -353,6 +358,7 @@ function useSinceViewed(file: FileDiffMetadata | null, on: boolean) {
 }
 
 export function DiffPane() {
+  const codeView = useRef<CodeViewHandle<Meta, undefined>>(null);
   const file = st.useStore((s) => st.currentFile(s));
   const style = st.useStore((s) => s.style);
   // Pierre throws on expandUnchanged for a partial diff, so only once the file's full text is in.
@@ -392,13 +398,14 @@ export function DiffPane() {
         st.setSelection(toPoint(range.side, range.start), toPoint(range.endSide ?? range.side, range.end));
         st.startComment();
       },
-      onTokenEnter: (t: DiffTokenEventBaseProps, e: PointerEvent) => {
+      onTokenEnter: (t: TokenEventBase | DiffTokenEventBaseProps, e: PointerEvent) => {
+        if (!("side" in t)) return;
         const at = tokenAt(t.side, t.lineNumber);
         if (at) tokenLink.enter(t.tokenElement, e, at, t.lineCharStart);
       },
-      onTokenLeave: (t: DiffTokenEventBaseProps) => tokenLink.leave(t.tokenElement),
-      onTokenClick: async (t: DiffTokenEventBaseProps, e: MouseEvent) => {
-        if (!linkKey(e)) return;
+      onTokenLeave: (t: TokenEventBase | DiffTokenEventBaseProps) => tokenLink.leave(t.tokenElement),
+      onTokenClick: async (t: TokenEventBase | DiffTokenEventBaseProps, e: MouseEvent) => {
+        if (!("side" in t) || !linkKey(e)) return;
         e.preventDefault();
         const at = tokenAt(t.side, t.lineNumber);
         if (!at || !(await tokenLink.symbolAt(at, t.lineCharStart))) return;
@@ -472,8 +479,20 @@ export function DiffPane() {
   }, [cursor, anchor, suggestingHere]);
 
   useEffect(() => {
-    if (cursor) revealLine(cursor.side, cursor.line);
-  }, [cursor]);
+    if (!cursor || !file) return;
+    // A drawn row gets the usual centre-or-nudge; CodeView only draws rows near the viewport,
+    // so a far jump asks it to centre the line instead.
+    if (findRow(cursor.side, cursor.line)) revealLine(cursor.side, cursor.line, 0);
+    else
+      codeView.current?.scrollTo({
+        type: "line",
+        id: file.name,
+        lineNumber: cursor.line,
+        side: cursor.side,
+        align: "center",
+        behavior: "instant",
+      });
+  }, [cursor, file]);
 
   const renderAnnotation = useCallback(
     (a: DiffLineAnnotation<Meta>) =>
@@ -495,9 +514,26 @@ export function DiffPane() {
     [],
   );
 
+  const items = useMemo<CodeViewDiffItem<Meta>[]>(
+    () =>
+      file
+        ? [
+            {
+              id: file.name,
+              type: "diff",
+              version: ++nextDiffVersion,
+              fileDiff: sinceDiff ?? file,
+              // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
+              annotations: sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations,
+              edit: !!suggestingHere && !suggestingHere.ending,
+            },
+          ]
+        : [],
+    [file, sinceDiff, annotations, suggestingHere],
+  );
+
   if (!file) return null;
   const { add, del } = stats(sinceDiff ?? file); // the counts follow the view
-  const dirs = dirname(file.name).split("/").filter(Boolean);
   // Which function or class the cursor is in, from the side it's on.
   const scope = cursor
     ? nav.enclosing(cursor.side === "additions" ? outline?.new : outline?.old, cursor.line).slice(-2)
@@ -511,26 +547,7 @@ export function DiffPane() {
             <SidebarExpand />
           </IconButton>
         ) : null}
-        <nav aria-label="File path" className="flex min-w-0 items-center gap-1 overflow-hidden text-[13px]">
-          {file.prevName ? (
-            <span className="truncate text-ink-3" title={`Renamed from ${file.prevName}`}>
-              {basename(file.prevName)} →
-            </span>
-          ) : null}
-          {dirs.map((d, i) => (
-            <span key={`${i}:${d}`} className="flex shrink items-center gap-1 truncate text-ink-3">
-              <span className="truncate">{d}</span>
-              <span className="text-line-strong">/</span>
-            </span>
-          ))}
-          <span className="min-w-[4ch] truncate font-medium text-ink">{basename(file.name)}</span>
-          {scope.map((sym) => (
-            <span key={`${sym.line}:${sym.name}`} className="flex min-w-0 shrink items-center gap-1 text-ink-2">
-              <NavArrowRight width={12} height={12} className="shrink-0 text-ink-3" />
-              <span className="truncate font-mono text-[12px]">{sym.name}</span>
-            </span>
-          ))}
-        </nav>
+        <FilePath path={file.name} previous={file.prevName?.split("/").pop()} scope={scope} />
         <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
           <span className="text-green">+{add}</span>
           <span className="text-red">−{del}</span>
@@ -583,18 +600,19 @@ export function DiffPane() {
         </div>
         {outlineOpen ? null : <OutlineToggle />}
       </header>
-      <div data-diff-scroll className="min-h-0 flex-1 overflow-auto">
-        <RightClick resolve={lineMenu}>
-          <FileDiff<Meta, undefined>
-            key={sinceDiff ? `since:${file.name}` : file.name}
-            fileDiff={sinceDiff ?? file}
+      <div className="min-h-0 flex-1">
+        <RightClick resolve={lineMenu} className="h-full">
+          <CodeView<Meta, undefined>
+            ref={codeView}
+            className="h-full overflow-auto"
+            containerRef={(node) => node?.setAttribute("data-diff-scroll", "")}
+            items={items}
             options={options}
-            // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
-            lineAnnotations={sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations}
-            renderAnnotation={renderAnnotation}
-            selectedLines={selected}
-            edit={!!suggestingHere && !suggestingHere.ending}
-            onEditComplete={onEditComplete}
+            renderAnnotation={(annotation, _source, item) =>
+              item.type === "diff" ? renderAnnotation(annotation as DiffLineAnnotation<Meta>) : null
+            }
+            selectedLines={selected ? { id: file.name, range: selected } : null}
+            onItemEditComplete={(event) => onEditComplete(event as FileDiffEditCompleteEvent<Meta, undefined>)}
           />
         </RightClick>
       </div>

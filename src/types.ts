@@ -81,7 +81,9 @@ export type Symbol = {
   /** function, method, class, interface, module, type, constant… (from the query's capture name) */
   kind: string;
   line: number;
+  startCol?: number;
   endLine: number;
+  endCol?: number;
   nameLine: number;
   nameCol: number;
 };

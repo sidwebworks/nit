@@ -50,7 +50,7 @@ const TREE_STYLE = {
   "--trees-font-size-override": "12.5px",
   "--trees-fg-override": "var(--ink-2)",
   "--trees-fg-muted-override": "var(--ink-3)",
-  "--trees-bg-override": "transparent",
+  "--trees-bg-override": "var(--canvas)", // truncation markers paint this over the name
   "--trees-bg-muted-override": "var(--hover)",
   "--trees-accent-override": "var(--accent)",
   "--trees-border-color-override": "var(--line)",
@@ -78,8 +78,22 @@ const SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" ari
 <circle cx="8" cy="8" r="2.4" fill="var(--orange)"/>
 </symbol></svg>`;
 
-// Counts never give way to a long name: the name truncates instead.
+// Counts never give way to a long name. Flattened paths keep their useful end
+// instead of squeezing every directory into a separate ellipsis.
 const TREE_CSS = `
+[data-item-section="content"] { flex: 1 1 0; min-width: 0; }
+[data-item-flattened-subitems] { display: flex; min-width: 0; max-width: 100%; gap: 0; font-size: 0; }
+[data-item-flattened-subitem] { min-width: 0; font-size: var(--trees-font-size); }
+[data-item-flattened-subitem]:nth-last-of-type(n + 3) { display: none; }
+[data-item-flattened-subitem]:nth-last-of-type(2) { display: flex; flex: 0 999999 auto; align-items: center; }
+[data-item-flattened-subitem]:nth-last-of-type(2):not(:first-of-type)::before {
+  content: "… / "; flex: none; white-space: pre;
+}
+[data-item-flattened-subitem]:nth-last-of-type(2)::after {
+  content: " / "; flex: none; white-space: pre;
+}
+[data-item-flattened-subitem]:last-of-type { display: flex; flex: 0 1 auto; min-width: 4ch; }
+[data-item-flattened-subitem] > [data-truncate-container] { min-width: 0; }
 [data-item-section="decoration"] { flex: 0 0 auto; overflow: visible; }
 [data-item-section="decoration"] > span {
   max-width: none; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums;

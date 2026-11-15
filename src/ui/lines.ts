@@ -46,6 +46,18 @@ export function changedLines(file: FileDiffMetadata) {
   return { added, removed };
 }
 
+/** In a sorted list of changed lines, find the first one inside a symbol's span. */
+export function firstInRange(lines: number[], start: number, end: number) {
+  let lo = 0;
+  let hi = lines.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (lines[mid] < start) lo = mid + 1;
+    else hi = mid;
+  }
+  return lines[lo] <= end ? lines[lo] : undefined;
+}
+
 export function stats(file: FileDiffMetadata) {
   let add = 0;
   let del = 0;

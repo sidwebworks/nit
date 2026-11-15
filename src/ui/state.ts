@@ -54,7 +54,7 @@ export type Peek = {
     }
 );
 
-export type Outline = { new: Sym[] | null; old: Sym[] | null };
+export type Outline = { new: Sym[] | null; old: Sym[] | null; oldLoaded: boolean };
 
 export type State = {
   data: ReviewData | null;

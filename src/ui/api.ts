@@ -89,8 +89,11 @@ export const api = {
     call<PostResult>("POST", "/api/github/review", { event, summary }),
   resolveThread: (id: string, resolved: boolean) => call("POST", `/api/github/threads/${id}/resolve`, { resolved }),
 
-  symbols: (path: string, prev?: string) =>
-    call<{ new: Sym[] | null; old: Sym[] | null }>("GET", `/api/symbols?${q({ path, prev })}`),
+  symbols: (path: string, prev?: string, includeOld = true) =>
+    call<{ new: Sym[] | null; old: Sym[] | null }>(
+      "GET",
+      `/api/symbols?${q({ path, prev, old: includeOld ? undefined : 0 })}`,
+    ),
   identifiers: (at: At) => call<{ name: string; col: number }[]>("GET", `/api/identifiers?${q(at)}`),
   definition: (at: At, by: { name: string } | { col: number }) =>
     call<{ name: string | null; results: Location[] }>("GET", `/api/definition?${q({ ...at, ...by })}`),
