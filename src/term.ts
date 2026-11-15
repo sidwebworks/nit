@@ -252,12 +252,13 @@ const failed = (what: string, error: string | null) => log(`${c.red("✕")} ${wh
 
 const running = new Set<string>();
 function job(j: Job) {
+  const who = j.reviewer === "codex" ? "Codex" : "Claude";
   const what =
     j.kind === "review"
-      ? "Claude reviewing the diff"
+      ? `${who} reviewing the diff`
       : j.kind === "guide"
-        ? "Claude ordering the files"
-        : `Claude answering about ${where(j)}`;
+        ? `${who} ordering the files`
+        : `${who} answering about ${where(j)}`;
   if (j.state === "running") {
     if (!running.has(j.id)) {
       running.add(j.id);

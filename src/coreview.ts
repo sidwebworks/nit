@@ -372,10 +372,12 @@ export const GUIDE_SCHEMA = {
             files: { type: "array", items: { type: "string" } },
           },
           required: ["title", "why", "files"],
+          additionalProperties: false,
         },
       },
     },
     required: ["chapters"],
+    additionalProperties: false,
   },
 };
 

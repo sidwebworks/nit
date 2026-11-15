@@ -8,6 +8,7 @@ import { createAuth } from "./auth";
 import { buildUI, isStale, uiDirFor } from "./build";
 import { categorize } from "./categories";
 import { checkoutPr, parsePrArg } from "./checkout";
+import { codexStatus, saveCodexKey } from "./codex";
 import { commandSettings, openInEditor, saveUserCommands } from "./config";
 import {
   ASK_INSTRUCTIONS,
@@ -29,6 +30,7 @@ import * as git from "./git";
 import { createGitHub, account as githubAccount, parseRemote, saveToken } from "./github";
 import { changedPaths, type Guidelines, guidelinesBlock, guidelineText, loadGuidelines } from "./guidelines";
 import { linearLink, linearRef, savedLinearKey, saveLinearKey } from "./linear";
+import { handleTools, setToolBase } from "./mcp-http";
 import { createNavigator } from "./navigate";
 import { claudeEnv, PrefsPatch, prefsOf, savedKey, saveKey } from "./prefs";
 import { createSnapshots } from "./snapshot";
@@ -756,6 +758,29 @@ const serve = (p: number) =>
           return json(prefs);
         }),
       },
+      "/api/auth/codex": {
+        GET: guarded(async () => json(await codexStatus())),
+      },
+      "/api/settings/codex-key": {
+        PUT: guarded(async (req) => {
+          const body = (await req.json().catch(() => null)) as { key?: unknown } | null;
+          const key = body?.key;
+          if (key !== null && (typeof key !== "string" || !/^sk-[\w-]{20,}$/.test(key.trim())))
+            return fail(400, "That isn't an OpenAI API key (they start with sk-).");
+          try {
+            await saveCodexKey(key === null ? null : key.trim());
+            return json({ hasKey: key !== null });
+          } catch (e) {
+            return fail(500, `Couldn't reach your keychain: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }),
+      },
+      // nit's tools for a Codex run (mcp-http.ts): the token in the path is the run's.
+      "/mcp/:token": async (req) => {
+        if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(req.headers.get("host") ?? ""))
+          return fail(403, "bad host");
+        return handleTools(req, req.params.token);
+      },
       "/api/settings/claude-key": {
         PUT: guarded(async (req) => {
           const body = (await req.json().catch(() => null)) as { key?: unknown } | null;
@@ -887,6 +912,7 @@ try {
   server = serve(0); // taken, most likely by another review of the same repo
 }
 port = server.port!;
+setToolBase(`http://127.0.0.1:${port}`);
 
 const url = `http://127.0.0.1:${server.port}`;
 const openBrowser = () => Bun.spawn([process.platform === "darwin" ? "open" : "xdg-open", url]);
@@ -933,13 +959,25 @@ void github.state().then((gh) => {
     term.log(term.c.dim(`· ${gh.reason} Comments stay local until there is one.`));
   else term.log(`${term.c.yellow("!")} GitHub: ${gh.reason}`);
 });
-void authStatus().then((a) => {
+void (prefsOf(store).reviewer === "codex" ? codexStatus() : Promise.resolve(null)).then((c) => {
+  if (!c) return;
+  if (!c.installed)
+    term.log(`${term.c.yellow("!")} Codex isn't installed, so Codex features are off.`, [
+      term.c.dim("Install it: npm i -g @openai/codex (or brew install codex)."),
+    ]);
+  else if (!c.loggedIn && !c.hasKey)
+    term.log(`${term.c.yellow("!")} Codex isn't signed in, so Codex features are off.`, [
+      term.c.dim("Run `codex login`. Or save an OpenAI API key in Settings → Reviewer."),
+    ]);
+});
+void (prefsOf(store).reviewer === "codex" ? Promise.resolve(null) : authStatus()).then((a) => {
+  if (!a) return;
   if (!a.installed)
     term.log(`${term.c.yellow("!")} Claude Code isn't installed, so Claude features are off.`, [
       term.c.dim("Install it from https://claude.com/claude-code"),
     ]);
   else if (!a.loggedIn && !a.hasKey)
     term.log(`${term.c.yellow("!")} Claude isn't signed in, so Claude features are off.`, [
-      term.c.dim("Run `claude`, then /login. Or save an API key in Settings → Claude."),
+      term.c.dim("Run `claude`, then /login. Or save an API key in Settings → Reviewer."),
     ]);
 });

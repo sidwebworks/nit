@@ -6,6 +6,7 @@ import {
   type SDKAssistantMessageError,
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { runCodex } from "./codex";
 import { within } from "./git";
 import type { Guidelines } from "./guidelines";
 import { claudeOptions, prefsOf, savedKey } from "./prefs";
@@ -194,6 +195,7 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
   const confineReview = confineTo(root, { guidelinesFromBase: true });
   let job: { job: Job; abort: AbortController } | null = null;
   const busy = () => current !== null || job !== null;
+  const reviewerName = () => (prefsOf(store).reviewer === "codex" ? "Codex" : "Claude");
   const announce = (j: Job) => emit({ type: "job", job: j });
 
   return {
@@ -324,10 +326,11 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
         finish?: (structured: unknown, j: Job) => Promise<void>;
       },
     ): Promise<Job> {
-      if (busy()) throw new Error("Claude is already working on this review.");
+      if (busy()) throw new Error(`${reviewerName()} is already working on this review.`);
       const j: Job = {
         id: crypto.randomUUID(),
         kind,
+        reviewer: prefsOf(store).reviewer,
         state: "running",
         startedAt: Date.now(),
         endedAt: null,
@@ -350,6 +353,35 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
       void (async () => {
         let structured: unknown;
         try {
+          const prefs = prefsOf(store);
+          if (prefs.reviewer === "codex") {
+            const r = await runCodex({
+              root,
+              prefs,
+              kind,
+              prompt: o.prompt,
+              instructions: o.instructions,
+              tools: o.tools,
+              schema: o.outputFormat?.schema,
+              // Each reviewer resumes only its own conversations ("codex-" marks Codex's).
+              resume: o.resume?.startsWith("codex-") ? o.resume.slice(6) : null,
+              signal: abort.signal,
+              onSession: (id) => {
+                j.sessionId = `codex-${id}`;
+              },
+              onTool: (tool, target) => emit({ type: "tool", tool, target }),
+              onText: (text) => {
+                j.answer = text;
+                emit({ type: "text", text });
+              },
+            });
+            j.error ??= r.error;
+            structured = r.structured;
+            if (kind === "ask") j.answer = r.answer;
+            if (!abort.signal.aborted && !j.error) await o.finish?.(structured, j);
+            j.state = abort.signal.aborted ? "stopped" : j.error ? "failed" : "done";
+            return;
+          }
           await decideKey();
           const messages = query({
             prompt: o.prompt,
@@ -365,7 +397,7 @@ export function createAgent(root: string, snapshots: Snapshots, store: Store) {
               includePartialMessages: kind === "ask",
               abortController: abort,
               ...(o.outputFormat ? { outputFormat: o.outputFormat } : {}),
-              ...(o.resume ? { resume: o.resume } : {}),
+              ...(o.resume && !o.resume.startsWith("codex-") ? { resume: o.resume } : {}),
             },
           });
           for await (const m of messages as AsyncIterable<SDKMessage>) {

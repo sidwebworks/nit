@@ -262,6 +262,13 @@ export type Prefs = {
   hideWhitespace: boolean;
   /** List files in Claude's reading order (when there is one) instead of as a tree. */
   guided: boolean;
+  /** Who answers questions, orders the files and co-reviews: Claude Code or Codex. */
+  reviewer: "claude" | "codex";
+  /** How Codex signs in: its own login (`codex login`), or the OpenAI key saved in nit. */
+  codexAuth: "login" | "apiKey";
+  /** A Codex model name; empty is Codex's own default. */
+  codexModel: string;
+  codexEffort: "default" | "low" | "medium" | "high" | "xhigh";
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -279,6 +286,10 @@ export const DEFAULT_PREFS: Prefs = {
   hideViewed: false,
   hideWhitespace: false,
   guided: true,
+  reviewer: "claude",
+  codexAuth: "login",
+  codexModel: "",
+  codexEffort: "default",
 };
 
 /** Your GitHub login for this repo's host: the token saved in nit, else the GitHub CLI's. */
@@ -299,11 +310,18 @@ export type AuthStatus = {
 
 /** A run or job that failed because Claude needs signing in again carries exactly this error. */
 export const SIGN_IN_ERROR = "Claude isn't signed in, or its sign-in expired.";
-export const API_KEY_ERROR = "The API key saved in nit was refused. Replace it in Settings → Claude.";
+export const API_KEY_ERROR = "The API key saved in nit was refused. Replace it in Settings → Reviewer.";
+export const CODEX_SIGN_IN_ERROR = "Codex isn't signed in, or its sign-in expired.";
+export const CODEX_KEY_ERROR = "The OpenAI API key saved in nit was refused. Replace it in Settings → Reviewer.";
+
+/** Whether Codex can run, as the page sees it: the same shape as Claude Code's. */
+export type CodexStatus = AuthStatus;
 
 export type Job = {
   id: string;
   kind: "review" | "ask" | "guide";
+  /** Who ran it. */
+  reviewer: "claude" | "codex";
   state: "running" | "done" | "stopped" | "failed";
   startedAt: number;
   endedAt: number | null;

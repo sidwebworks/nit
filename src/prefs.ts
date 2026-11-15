@@ -19,6 +19,10 @@ const FIELDS = {
   hideViewed: z.boolean(),
   hideWhitespace: z.boolean(),
   guided: z.boolean(),
+  reviewer: z.enum(["claude", "codex"]),
+  codexAuth: z.enum(["login", "apiKey"]),
+  codexModel: z.string().trim().max(64),
+  codexEffort: z.enum(["default", "low", "medium", "high", "xhigh"]),
 } satisfies Record<keyof Prefs, z.ZodType>;
 
 /** What the settings screen may save. Keys nit doesn't know (an older or newer page's) are dropped. */
