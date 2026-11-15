@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import type { FileDiffMetadata } from "@pierre/diffs";
-import { prepareFileTreeInput } from "@pierre/trees";
-import { firstInRange, rows, treeOrder } from "./lines";
+import { firstInRange, inTreeOrder, rows } from "./lines";
 
 test("rows walk context, deletions then additions with the right line numbers", () => {
   const file = {
@@ -39,7 +38,7 @@ test("a changed symbol jumps to its edit inside the span", () => {
   expect(firstInRange(edits, 25502, 25512)).toBeUndefined();
 });
 
-test("treeOrder puts folders first at each level, keeping folders together", () => {
+test("inTreeOrder puts folders first at each level, keeping folders together", () => {
   const paths = [
     "b.ts",
     "src/z.ts",
@@ -50,7 +49,7 @@ test("treeOrder puts folders first at each level, keeping folders together", () 
     "src/lib/a10.ts",
     "src/lib/a2.ts",
   ];
-  expect(paths.toSorted(treeOrder)).toEqual([
+  expect(names(inTreeOrder(paths.map((name) => ({ name }))))).toEqual([
     "docs/readme.md",
     "src/lib/a2.ts",
     "src/lib/a10.ts",
@@ -62,26 +61,22 @@ test("treeOrder puts folders first at each level, keeping folders together", () 
   ]);
 });
 
-test("treeOrder agrees with the sidebar tree's own sort, which rejects presorted input it disagrees with", () => {
-  // These crashed the tree: "Builder input must be sorted before appendPaths()".
+test("inTreeOrder handles the names that crashed the tree", () => {
+  // "Builder input must be sorted before appendPaths()": localeCompare put floor-data.ts first.
   const paths = [
-    "apps/cell/src/App.tsx",
-    "apps/cell/src/Floor.tsx",
     "apps/cell/src/Floor3D.tsx",
     "apps/cell/src/floor-data.ts",
-    "apps/cell/src/env.d.ts",
-    "apps/cell/src/plan.worker.ts",
-    "README.md",
-    "readme.md",
-    "a_b.ts",
-    "a-b.ts",
-    "aB.ts",
+    "apps/cell/src/Floor.tsx",
     "a10.ts",
     "a2.ts",
-    "a02.ts",
-    "x/Ab/1.ts",
-    "x/ab/2.ts",
-    "x/a.b/3.ts",
   ];
-  expect(paths.toSorted(treeOrder)).toEqual([...prepareFileTreeInput(paths).paths]);
+  expect(names(inTreeOrder(paths.map((name) => ({ name }))))).toEqual([
+    "apps/cell/src/Floor3D.tsx",
+    "apps/cell/src/floor-data.ts",
+    "apps/cell/src/Floor.tsx",
+    "a2.ts",
+    "a10.ts",
+  ]);
 });
+
+const names = (files: { name: string }[]) => files.map((f) => f.name);

@@ -17,7 +17,7 @@ import {
   type Symbol as Sym,
 } from "../types";
 import { api } from "./api";
-import { type Row, rows, treeOrder } from "./lines";
+import { inTreeOrder, type Row, rows } from "./lines";
 import { toasts } from "./toasts";
 
 export type Point = { side: Side; line: number };
@@ -258,12 +258,13 @@ export async function load() {
     const files = same
       ? state.files
       : // Keys that change with the patch let the highlight pool reuse work when you switch back.
-        parsePatchFiles(data.patch, { cacheKeyPrefix: `p${hashOf(data.patch)}` })
-          .flatMap((p) => p.files)
-          // A new or deleted file's patch already holds every line of it. Pierre won't hydrate
-          // those (and needn't); left partial, suggestions and the whole-file view refused them.
-          .map((f) => (f.type === "new" || f.type === "deleted" ? { ...f, isPartial: false } : f))
-          .sort((a, b) => treeOrder(a.name, b.name));
+        inTreeOrder(
+          parsePatchFiles(data.patch, { cacheKeyPrefix: `p${hashOf(data.patch)}` })
+            .flatMap((p) => p.files)
+            // A new or deleted file's patch already holds every line of it. Pierre won't hydrate
+            // those (and needn't); left partial, suggestions and the whole-file view refused them.
+            .map((f) => (f.type === "new" || f.type === "deleted" ? { ...f, isPartial: false } : f)),
+        );
     const before = currentFile()?.name;
     set((s) => {
       // On first load, the first file the list shows: not a lockfile it sets aside.

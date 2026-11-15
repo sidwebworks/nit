@@ -162,7 +162,7 @@ export function ChangedTree() {
   );
   const { model } = useFileTree({
     paths: shown ? shown.split("\n") : [],
-    presorted: true, // the store keeps files in tree order (lines.treeOrder)
+    presorted: true, // the store keeps files in tree order (lines.inTreeOrder)
     initialExpansion: "open",
     flattenEmptyDirectories: true,
     itemHeight: 28,
