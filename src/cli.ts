@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { type createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 import { z } from "zod";
@@ -182,6 +182,19 @@ if (!compiled() && (dev || isStale(uiDir)))
     () => buildUI(uiDir),
     () => "Built the page",
   );
+
+/** The images the diff shows as pictures (ui/ImageDiff.tsx keeps the same list). */
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  svg: "image/svg+xml",
+};
 
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 const fail = (status: number, error: string) => json({ error }, status);
@@ -370,6 +383,32 @@ const serve = (p: number) =>
           } catch (e) {
             return fail(400, String(e));
           }
+        }),
+      },
+      "/api/image": {
+        // An image's bytes on one side of the diff: the base (old) or the working tree (new).
+        GET: guarded(async (req) => {
+          const q = new URL(req.url).searchParams;
+          const path = q.get("path") ?? "";
+          const type = IMAGE_TYPES[extname(path).slice(1).toLowerCase()];
+          if (!validPath(path) || !type) return fail(400, "not an image in this repo");
+          const file = Bun.file(git.safePath(root, path));
+          const old = q.get("side") === "old" ? await git.bytesAtRef(root, mergeBase, path) : null;
+          const body = old
+            ? new Blob([new Uint8Array(old)])
+            : q.get("side") !== "old" && (await file.exists())
+              ? file
+              : null;
+          if (!body) return fail(404, "not on that side");
+          return new Response(body, {
+            headers: {
+              "content-type": type,
+              // An SVG opened on its own must not run script in nit's origin.
+              "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+              "x-content-type-options": "nosniff",
+              "cache-control": "no-cache",
+            },
+          });
         }),
       },
       "/api/drafts": {

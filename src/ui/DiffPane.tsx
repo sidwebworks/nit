@@ -31,6 +31,7 @@ import * as agent from "./agent";
 import { type At, api } from "./api";
 import { HIGHLIGHTER } from "./Code";
 import { DraftAnnotation } from "./Comments";
+import { ImageDiff, isImage } from "./ImageDiff";
 import { stats } from "./lines";
 import { copy, type MenuItem, RightClick, selectedText } from "./Menu";
 import * as nav from "./nav";
@@ -497,6 +498,7 @@ export function DiffPane() {
 
   if (!file) return null;
   const { add, del } = stats(sinceDiff ?? file); // the counts follow the view
+  const image = isImage(file.name);
   const dirs = dirname(file.name).split("/").filter(Boolean);
   // Which function or class the cursor is in, from the side it's on.
   const scope = cursor
@@ -531,10 +533,12 @@ export function DiffPane() {
             </span>
           ))}
         </nav>
-        <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
-          <span className="text-green">+{add}</span>
-          <span className="text-red">−{del}</span>
-        </span>
+        {image ? null : (
+          <span className="flex h-[22px] shrink-0 items-center gap-1.5 rounded-chip bg-inset px-1.5 font-mono text-[11.5px] tabular-nums shadow-[inset_0_0_0_1px_var(--line)]">
+            <span className="text-green">+{add}</span>
+            <span className="text-red">−{del}</span>
+          </span>
+        )}
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {changedSince ? (
@@ -548,14 +552,16 @@ export function DiffPane() {
               ]}
             />
           ) : null}
-          <IconButton
-            label={full ? "Fold unchanged lines" : "Show the whole file"}
-            keys="f"
-            onClick={() => void st.setFullFile(file.name, !full)}
-            className={full ? "bg-hover-2 text-ink" : ""}
-          >
-            <Expand />
-          </IconButton>
+          {image ? null : (
+            <IconButton
+              label={full ? "Fold unchanged lines" : "Show the whole file"}
+              keys="f"
+              onClick={() => void st.setFullFile(file.name, !full)}
+              className={full ? "bg-hover-2 text-ink" : ""}
+            >
+              <Expand />
+            </IconButton>
+          )}
           <IconButton label="Comment on file" keys="C" onClick={st.startFileComment}>
             <ChatPlusIn />
           </IconButton>
@@ -584,19 +590,23 @@ export function DiffPane() {
         {outlineOpen ? null : <OutlineToggle />}
       </header>
       <div data-diff-scroll className="min-h-0 flex-1 overflow-auto">
-        <RightClick resolve={lineMenu}>
-          <FileDiff<Meta, undefined>
-            key={sinceDiff ? `since:${file.name}` : file.name}
-            fileDiff={sinceDiff ?? file}
-            options={options}
-            // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
-            lineAnnotations={sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations}
-            renderAnnotation={renderAnnotation}
-            selectedLines={selected}
-            edit={!!suggestingHere && !suggestingHere.ending}
-            onEditComplete={onEditComplete}
-          />
-        </RightClick>
+        {image ? (
+          <ImageDiff file={file} layout={style} />
+        ) : (
+          <RightClick resolve={lineMenu}>
+            <FileDiff<Meta, undefined>
+              key={sinceDiff ? `since:${file.name}` : file.name}
+              fileDiff={sinceDiff ?? file}
+              options={options}
+              // Since you viewed, the old side is your viewed copy, not the base: only new-side notes fit.
+              lineAnnotations={sinceDiff ? annotations.filter((a) => a.side === "additions") : annotations}
+              renderAnnotation={renderAnnotation}
+              selectedLines={selected}
+              edit={!!suggestingHere && !suggestingHere.ending}
+              onEditComplete={onEditComplete}
+            />
+          </RightClick>
+        )}
       </div>
     </main>
   );

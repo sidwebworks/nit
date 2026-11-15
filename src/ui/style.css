@@ -391,6 +391,13 @@ pre[style*="--hls-dark"] span {
   }
 }
 
+/* Behind a changed image: a quiet checkerboard, so transparency reads. */
+.image-backdrop {
+  background-color: var(--page);
+  background-image: conic-gradient(var(--inset) 25%, transparent 0 50%, var(--inset) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}
+
 /* The logo while a review loads (a big one takes seconds). It waits 300ms before fading in,
    so a quick load never flashes it, then breathes. */
 .loading {
