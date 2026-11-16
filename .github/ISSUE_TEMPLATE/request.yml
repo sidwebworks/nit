@@ -1,0 +1,11 @@
+name: A request
+description: Something nit should do, or do differently
+labels: [request]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to do
+      description: The review you were doing and what got in the way, more than the feature you have in mind.
+    validations:
+      required: true

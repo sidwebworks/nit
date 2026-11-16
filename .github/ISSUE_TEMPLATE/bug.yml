@@ -1,0 +1,31 @@
+name: Something is wrong
+description: nit did something it shouldn't, or didn't do something it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what nit did instead. A screenshot helps.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: nit version
+      description: The output of `nit --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options: [macOS (Apple silicon), macOS (Intel), Linux x64, Linux arm64]
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The last lines of `nit --attach`, if they say anything. Remove anything private first.
+      render: text
