@@ -101,7 +101,7 @@ Supported means every case in nit's conformance suite passes: definitions throug
 
 ![Repository-wide search](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/search.png)
 
-**Merge conflicts, resolved in place.** When the base has moved, nit says which files a merge would conflict in, before you merge. Start the merge from that badge and resolve each conflict side by side: take yours, theirs or both, or type the result. nit stages what you resolve and stops before the commit, which stays yours. Abort puts your checkout back as it was.
+**Merge conflicts, resolved in place.** When the base has moved, nit says which files a merge would conflict in, before you merge. When a merge stops on conflicts, resolve each one side by side: take yours, theirs or both, or type the result. nit stages what you resolve, and the commit stays yours.
 
 **Take a change back.** With the cursor on a change, `⌘⌫` puts the base's lines back in your working tree. A toast undoes it, and nothing is written if the file changed since the diff was read.
 
