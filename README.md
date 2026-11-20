@@ -44,21 +44,37 @@ nit opens a tab and gives your terminal back. One server in the background serve
 
 ## Code tools for your agent
 
-`nit mcp` is an MCP server on stdin and stdout. Run from a repository, it gives any agent the tools nit's own agent uses, for the branch you're on: what the change can break, a file's diff, the diff by syntax (which hunks are only formatting, which blocks only moved), definitions, references, callers, types, a file's outline, and fast search. They only read. It is part of nit Pro. Add it to an agent the way you add any MCP server, for example:
+`nit mcp` is an MCP server on stdin and stdout. Run from a repository, it gives any agent the tools nit's own agent uses, one job each (`review`, `impact`, `diff`, `read`, `symbol`, `search`, `checks`, `source`), every place in their answers written `path:line`: what the change can break (SQL functions included, and a new migration dated before the base's newest), the pull request's failing checks, a dependency's own source at the version the project uses (installed, or cloned once when allowed), the diff by syntax (formatting and moved blocks set aside, the real changes spelled out, and a migration's restated SQL function against the one it replaces), definitions, references, callers, types, a file's outline, and fast search. They only read. The agent can point them at a pull request (checked out in a worktree of its own, never the branch you are on; a worktree that already has its branch is used, and the agent is told what that worktree holds), another branch, or the review you have open in nit. It is part of nit Pro. Add it to an agent the way you add any MCP server, for example:
 
 ```
 claude mcp add nit -- nit mcp
+```
+
+For Claude Desktop or opencode, `nit mcp add claude-desktop` (or `opencode`) writes nit into the app's config. Started outside any repository, the tools follow the review open in nit, and the agent can name a pull request's URL or a repository folder instead.
+
+Then teach the agent when to use them. `nit mcp skill` installs five skills once, in `~/.agents/skills`, where Codex, Cursor, Gemini CLI and opencode read them, and links each into Claude Code's skills, so an update reaches every agent. `nit mcp skill --print` prints them for any other agent, and the server offers them as MCP prompts to any agent that adds it.
+
+- `nit-review-pr` reviews a pull request end to end, in order: point the tools at it, what it can break and its checks, the syntax diff file by file (SQL migrations first), the callers of what changed, the description against the diff, then its structure, with the agent's own skills that fit the change. It reports in one fixed shape: a verdict, findings, where the description disagrees, and what was checked.
+- `nit-what-breaks` reads what a change can break: which rows to trust, how to settle a by-name row with `symbol`, what a SQL function's by-string uses are, and the callers a changed body can break without a changed signature.
+- `nit-ci-to-diff` matches failing checks to the lines the change touches, and says which failures are unrelated.
+- `nit-library-source` checks a claim about a dependency against its own source, with the `source` tool.
+- `nit-pr-body` gathers a pull request body's facts (the real changes, what they can break, what CI says, risky migrations) and writes them in the format of your own `pr` skill if you have one.
+
+Each says what agents got wrong reviewing with nit, and the longer ones carry worked examples of the tools' answers in files beside them, read when needed.
+
+```
+nit mcp skill
 ```
 
 ## Community and Pro
 
 Everything you do in nit yourself is free. What an agent does is nit Pro: the AI features (co-review, questions about lines, the reading guide, applying comments) and `nit mcp`, nit's code tools for your own agent. How to get a key is at [sidwebworks.com/things/nit](https://sidwebworks.com/things/nit).
 
-**What nit sends, and to whom.** nit makes two kinds of network call on its own, and no telemetry: the daily check for a newer release on GitHub, and, once you have a key, a daily check with Dodo Payments that the key is still valid. That check sends the key, this device's activation id and "nit on macOS" (or Linux), nothing about you, your machine or your code. Without a key, nit never calls Dodo. Two calls happen only when you ask: ⌘-click on a dependency or a bare import opens the package's card, and nit asks that package's registry (npm, crates.io, Go's module proxy or PyPI) about it by name, nothing else, keeping the answer in your browser for a day; and installing a checkout's packages runs its package manager, which fetches them from its registry.
+**What nit sends, and to whom.** nit makes two kinds of network call on its own, and no telemetry: the check for a newer release on GitHub, every hour while its server runs, and, once you have a key, a daily check with Dodo Payments that the key is still valid. That check sends the key, this device's activation id and "nit on macOS" (or Linux), nothing about you, your machine or your code. Without a key, nit never calls Dodo. Three happen only when you or your agent ask: ⌘-click on a dependency or a bare import opens the package's card, and nit asks that package's registry (npm, crates.io, Go's module proxy or PyPI) about it by name, nothing else, keeping the answer in your browser for a day; installing a checkout's packages runs its package manager, which fetches them from its registry; and when an agent asks for a dependency's source that isn't installed, nit clones that package's repository from GitHub, GitLab or Bitbucket at its version, once, into its own folder (off in Settings → MCP).
 
 ## What it does
 
-**Go to definition, without a language server.** nit reads the code with tree-sitter, in the diff and in any file you open: an outline of every file, go to definition, and find references, shown in place under the line, with nothing to install, configure or index. For exact answers, types on hover, type definitions, implementations and callers, turn on a language server you already have for a repository from the bottom of the outline. Every review starts without one. A pull request's worktree reads its packages' types from your main clone's; when it has none, or the pull request changes them, the hover card says so and installs the checkout's own with one click, running none of their install scripts.
+**Go to definition, without a language server.** nit reads the code with tree-sitter, in the diff and in any file you open: an outline of every file, go to definition, and find references, shown in place under the line, with nothing to install, configure or index. For exact answers, types on hover, type definitions, implementations and callers, turn on a language server you already have for a repository from the bottom of the outline. Every review starts without one. An agent's tools (`nit mcp`, co-review) start the one installed for the files they ask about, for that review only, unless it runs the branch's own build files (Rust, Ruby, C#, Zig); Settings → MCP turns that off. A pull request's worktree reads its packages' types from your main clone's; when it has none, or the pull request changes them, the hover card says so and installs the checkout's own with one click, running none of their install scripts.
 
 <!-- languages: generated by scripts/languages.ts from the conformance grid -->
 | Language | nit's own reading | Language server |
@@ -74,6 +90,7 @@ Everything you do in nit yourself is free. What an agent does is nit Pro: the AI
 | Rust | supported | rust-analyzer |
 | TSX | supported | TypeScript's (tsc --lsp) or typescript-language-server |
 | TypeScript | supported | TypeScript's (tsc --lsp) or typescript-language-server |
+| Zig | supported | zls |
 
 Supported means every case in nit's conformance suite passes: definitions through imports, renamed imports and re-exports, locals that shadow them, methods, what a file exports, and calls reformatted across lines. A language server, once on, answers instead, and also gives types on hover, type definitions, implementations and callers.
 <!-- /languages -->
@@ -84,7 +101,11 @@ Supported means every case in nit's conformance suite passes: definitions throug
 
 ![Repository-wide search](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/search.png)
 
-**AI, when you ask.** Select lines and press `⌘I`. The AI reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept or drop. Conversations stay on your machine.
+**Merge conflicts, resolved in place.** When the base has moved, nit says which files a merge would conflict in, before you merge. Start the merge from that badge and resolve each conflict side by side: take yours, theirs or both, or type the result. nit stages what you resolve and stops before the commit, which stays yours. Abort puts your checkout back as it was.
+
+**Take a change back.** With the cursor on a change, `⌘⌫` puts the base's lines back in your working tree. A toast undoes it, and nothing is written if the file changed since the diff was read.
+
+**AI, when you ask.** Select lines and press `⌘I`. The AI reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept or drop. Its review says what it checked and what it thought of how the change is built. It reviews by the same skills `nit mcp skill` gives your own agent, so one improvement to a skill reaches both. Conversations stay on your machine.
 
 ![Asking AI about the selected lines](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/ask.png)
 
@@ -109,6 +130,8 @@ Supported means every case in nit's conformance suite passes: definitions throug
 | `g` `d` | Go to definition |
 | `o` | Open in your editor |
 | `v` | Mark the file viewed |
+| `⌘⌫` | Revert the change under the cursor |
+| `⌘/` | Every shortcut, and where to change them |
 | `⌘⇧F` | Search the repository |
 | `⌘K` | Every file and action |
 | `⌘⇧↵` | Review and post |
