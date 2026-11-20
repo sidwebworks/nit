@@ -125,6 +125,38 @@ Reviews, drafts and settings stay on your machine, in `~/.local/share/nit` (or `
 
 This repository is where nit's releases are published and where problems and requests are tracked: [open an issue](https://github.com/sidwebworks/nit/issues/new/choose). nit's source is not public from version 1.3.0; the earlier, MIT-licensed prototype (up to 1.2.1) is on the [`prototype`](https://github.com/sidwebworks/nit/tree/prototype) branch.
 
+## Standing on the shoulders of giants
+
+nit exists because of other people's work. It would not be possible without these projects, and a few lines here are the least we owe them.
+
+**Reading code**
+- [tree-sitter](https://tree-sitter.github.io) and its grammars: every outline, definition and "what does this change break" answer starts with its syntax trees.
+- [ast-grep](https://ast-grep.github.io): searching code by its shape.
+- [fff](https://github.com/dmtrKovalenko/fff.nvim): the file and text search that keeps a 100,000-file repository instant.
+- [pg_query](https://github.com/pganalyze/pg_query.rs) and [sqlparser](https://github.com/apache/datafusion-sqlparser-rs): reading SQL the way Postgres does.
+- The language servers of every language nit supports, and the people who maintain them.
+
+**Diffs and git**
+- [Git](https://git-scm.com), of course.
+- [gitoxide](https://github.com/GitoxideLabs/gitoxide): reading repositories from Rust.
+- [imara-diff](https://github.com/pascalkuthe/imara-diff): fast, readable diffs.
+- [odiff](https://github.com/dmtrKovalenko/odiff): nit's pixel diff for images is a port of its comparison.
+
+**The page**
+- [Pierre](https://pierre.computer)'s diffs, trees, words and theming: the diff view and the file tree are theirs.
+- [React](https://react.dev), [Vite](https://vite.dev), [Tailwind CSS](https://tailwindcss.com) and [TypeScript](https://www.typescriptlang.org).
+- [TanStack](https://tanstack.com) Router, Query, Store, Hotkeys and Pacer.
+- [Base UI](https://base-ui.com), [Silk](https://silkhq.com) and [Virtuoso](https://virtuoso.dev).
+- [Phosphor Icons](https://phosphoricons.com) and the [Inter](https://rsms.me/inter) typeface.
+- The [Vesper](https://github.com/raunofreiberg/vesper) and [Night Owl](https://github.com/sdras/night-owl-vscode-theme) themes, nit's defaults.
+
+**The engine**
+- [Rust](https://www.rust-lang.org), [Tokio](https://tokio.rs) and [axum](https://github.com/tokio-rs/axum).
+- [SQLite](https://sqlite.org) through [rusqlite](https://github.com/rusqlite/rusqlite), and [redb](https://www.redb.org).
+- [rmcp](https://github.com/modelcontextprotocol/rust-sdk), the Model Context Protocol's Rust SDK.
+- [clap](https://github.com/clap-rs/clap), [serde](https://serde.rs), [rayon](https://github.com/rayon-rs/rayon), [moka](https://github.com/moka-rs/moka) and [keyring](https://github.com/open-source-cooperative/keyring-rs).
+- [Zig](https://ziglang.org) and [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild), which build nit for every platform from one machine.
+
 ## Licence
 
 nit is proprietary software. You may install and use it free of charge, for any work including commercial work; nit Pro's features need a licence key. You may not redistribute or modify it. The terms are in `LICENSE`. Versions up to and including 1.2.1 were released under the MIT licence and stay available under it. The third-party software in nit keeps its own licences: they are in `THIRD-PARTY-NOTICES.txt`, beside nit in every release archive (`nit notices` says where).
