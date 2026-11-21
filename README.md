@@ -4,7 +4,7 @@
 
 A keyboard-first code review tool for engineers who read the code. AI helps when you ask.
 
-`nit` opens your branch, or any pull request, in your browser: a fast diff, code navigation that understands the language, search across the whole repository, and the keyboard for everything. You read, comment, and post one review to GitHub. AI is there when you want a second reader, and stays out of the way when you don't.
+`nit` opens your branch, or any pull request, in your browser: a fast diff, code navigation that understands the language, search across the whole repository, and the keyboard for everything. You read and comment, and post to GitHub the way you do there: a comment at once, or all of them as one review. AI is there when you want a second reader, and stays out of the way when you don't.
 
 **[sidwebworks.com/things/nit](https://sidwebworks.com/things/nit)**
 
@@ -105,11 +105,11 @@ Supported means every case in nit's conformance suite passes: definitions throug
 
 **Take a change back.** With the cursor on a change, `⌘⌫` puts the base's lines back in your working tree. A toast undoes it, and nothing is written if the file changed since the diff was read.
 
-**AI, when you ask.** Select lines and press `⌘I`. The AI reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept or drop. Its review says what it checked and what it thought of how the change is built. It reviews by the same skills `nit mcp skill` gives your own agent, so one improvement to a skill reaches both. Conversations stay on your machine.
+**AI, when you ask.** Select lines and press `⌘I`. The AI reads the code around them with the same navigation and search, checks the project's guidelines, and answers under the lines. It can also suggest an order to read the files in, or draft comments you accept, edit or drop. Its review says what it checked and what it thought of how the change is built. It reviews by the same skills `nit mcp skill` gives your own agent, so one improvement to a skill reaches both. Conversations stay on your machine.
 
 ![Asking AI about the selected lines](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/ask.png)
 
-**Comments and suggestions, posted as one review.** `c` comments on the selected lines; a suggested change shows as a diff, as on GitHub. Drafts save as you type, and the review posts in one go: Comment, Approve or Request changes.
+**Comments and suggestions, posted the way GitHub does.** `c` comments on the selected lines; a suggested change shows as a diff, as on GitHub. Post a comment at once with `⌥⌘↵`, or add it to your review with `⌘↵` and submit them together: Comment, Approve or Request changes. The pull request panel has the same review box, so you can approve with no comments at all. Drafts save as you type.
 
 ![A draft comment with a suggested change](https://raw.githubusercontent.com/sidwebworks/nit/main/docs/media/comment.png)
 
@@ -126,6 +126,8 @@ Supported means every case in nit's conformance suite passes: definitions throug
 | `j` `k` | Next and previous file |
 | `n` `p` | Next and previous change |
 | `c` | Comment on the selected lines |
+| `⌘↵` | Add the comment to your review |
+| `⌥⌘↵` | Post the comment at once |
 | `⌘I` | Ask AI about them |
 | `g` `d` | Go to definition |
 | `o` | Open in your editor |
