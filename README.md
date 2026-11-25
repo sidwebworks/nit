@@ -171,7 +171,7 @@ nit exists because of other people's work. It would not be possible without thes
 - [Pierre](https://pierre.computer)'s diffs, trees, words and theming: the diff view and the file tree are theirs.
 - [React](https://react.dev), [Vite](https://vite.dev), [Tailwind CSS](https://tailwindcss.com) and [TypeScript](https://www.typescriptlang.org).
 - [TanStack](https://tanstack.com) Router, Query, Store, Hotkeys and Pacer.
-- [Base UI](https://base-ui.com), [Silk](https://silkhq.com) and [Virtuoso](https://virtuoso.dev).
+- [Base UI](https://base-ui.com) and [Virtuoso](https://virtuoso.dev).
 - [Phosphor Icons](https://phosphoricons.com) and the [Inter](https://rsms.me/inter) typeface.
 - The [Vesper](https://github.com/raunofreiberg/vesper) and [Night Owl](https://github.com/sdras/night-owl-vscode-theme) themes, nit's defaults.
 
